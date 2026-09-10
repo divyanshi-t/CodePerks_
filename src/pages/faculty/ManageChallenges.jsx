@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getChallenges, setChallenges, getCurrentUser } from '../../utils/localStorage';
+import { apiGetChallenges, apiCreateChallenge, apiUpdateChallenge, apiDeleteChallenge } from '../../utils/api';
 
 export const ManageChallenges = () => {
   const [challenges, setChallengesList] = useState([]);
@@ -47,8 +48,15 @@ export const ManageChallenges = () => {
   ];
 
   useEffect(() => {
-    setChallengesList(getChallenges());
     setUser(getCurrentUser());
+    apiGetChallenges()
+      .then(data => {
+        setChallengesList(data);
+        setChallenges(data);
+      })
+      .catch(() => {
+        setChallengesList(getChallenges());
+      });
   }, []);
 
   const handleOpenAddModal = () => {
@@ -77,9 +85,8 @@ export const ManageChallenges = () => {
     setIsModalOpen(true);
   };
 
-  const handleSaveChallenge = (e) => {
+  const handleSaveChallenge = async (e) => {
     e.preventDefault();
-    const all = getChallenges();
 
     if (!formData.title.trim()) {
       alert('Please enter a challenge title.');
@@ -94,53 +101,70 @@ export const ManageChallenges = () => {
       return;
     }
 
-    if (editingChallenge) {
-      const updated = all.map(c =>
-        c.id === editingChallenge.id
-          ? {
-              ...c,
-              ...formData,
-              points: Number(formData.points),
-              updatedAt: new Date().toISOString().split('T')[0]
-            }
-          : c
-      );
-      setChallenges(updated);
-      setChallengesList(updated);
-      showToast('Challenge updated successfully.');
-    } else {
-      const newChall = {
-        id: `chall_${Date.now()}`,
-        ...formData,
-        points: Number(formData.points),
-        createdBy: user?.name || 'CSE Faculty',
-        createdAt: new Date().toISOString().split('T')[0],
-        acceptanceRate: '100%',
-        starterCodes: {
-          python: `import sys\n# Write solution here\nprint("Result")`,
-          cpp: `#include <iostream>\nusing namespace std;\nint main() { return 0; }`,
-          java: `import java.util.*;\npublic class Solution {\n    public static void main(String[] args) {}\n}`,
-          c: `#include <stdio.h>\nint main() { return 0; }`
-        },
-        testCases: [
-          {
-            id: 1,
-            input: formData.sampleInput || '1',
-            expectedOutput: formData.sampleOutput || '1',
-            isHidden: false
-          }
-        ]
-      };
-      all.unshift(newChall);
-      setChallenges(all);
-      setChallengesList(all);
-      showToast('Challenge created successfully!');
+    const payload = {
+      ...formData,
+      points: Number(formData.points),
+      createdBy: user?.name || 'CSE Faculty'
+    };
+
+    try {
+      if (editingChallenge) {
+        const updated = await apiUpdateChallenge(editingChallenge.id, payload);
+        const all = getChallenges();
+        const newAll = all.map(c => c.id === editingChallenge.id ? updated : c);
+        setChallenges(newAll);
+        setChallengesList(newAll);
+        showToast('Challenge updated successfully.');
+      } else {
+        const created = await apiCreateChallenge(payload);
+        const all = getChallenges();
+        all.unshift(created);
+        setChallenges(all);
+        setChallengesList([created, ...challenges]);
+        showToast('Challenge created successfully!');
+      }
+    } catch {
+      // Fallback: localStorage only
+      const all = getChallenges();
+      if (editingChallenge) {
+        const newAll = all.map(c =>
+          c.id === editingChallenge.id
+            ? { ...c, ...formData, points: Number(formData.points), updatedAt: new Date().toISOString().split('T')[0] }
+            : c
+        );
+        setChallenges(newAll);
+        setChallengesList(newAll);
+        showToast('Challenge updated successfully.');
+      } else {
+        const newChall = {
+          id: `chall_${Date.now()}`,
+          ...formData,
+          points: Number(formData.points),
+          createdBy: user?.name || 'CSE Faculty',
+          createdAt: new Date().toISOString().split('T')[0],
+          acceptanceRate: '100%',
+          starterCodes: {
+            python: `import sys\n# Write solution here\nprint("Result")`,
+            cpp: `#include <iostream>\nusing namespace std;\nint main() { return 0; }`,
+            java: `import java.util.*;\npublic class Solution {\n    public static void main(String[] args) {}\n}`,
+            c: `#include <stdio.h>\nint main() { return 0; }`
+          },
+          testCases: [{ id: 1, input: formData.sampleInput || '1', expectedOutput: formData.sampleOutput || '1', isHidden: false }]
+        };
+        all.unshift(newChall);
+        setChallenges(all);
+        setChallengesList(all);
+        showToast('Challenge created successfully!');
+      }
     }
 
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
+    try {
+      await apiDeleteChallenge(id);
+    } catch {}
     const all = getChallenges();
     const filtered = all.filter(c => c.id !== id);
     setChallenges(filtered);
@@ -149,9 +173,12 @@ export const ManageChallenges = () => {
     showToast('Challenge deleted.');
   };
 
-  const toggleStatus = (challenge) => {
-    const all = getChallenges();
+  const toggleStatus = async (challenge) => {
     const newStatus = challenge.status === 'published' ? 'draft' : 'published';
+    try {
+      await apiUpdateChallenge(challenge.id, { status: newStatus });
+    } catch {}
+    const all = getChallenges();
     const updated = all.map(c => c.id === challenge.id ? { ...c, status: newStatus } : c);
     setChallenges(updated);
     setChallengesList(updated);

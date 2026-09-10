@@ -13,6 +13,7 @@ import {
   getNotifications,
   setNotifications
 } from '../../utils/localStorage';
+import { apiCreateRedemption, apiUpdateUser, apiGetRewards } from '../../utils/api';
 
 export const Rewards = () => {
   const navigate = useNavigate();
@@ -36,8 +37,16 @@ export const Rewards = () => {
   ];
 
   useEffect(() => {
-    setRewardsList(getRewards().filter(r => r.status === 'active'));
     setUser(getCurrentUser());
+    apiGetRewards()
+      .then(data => {
+        const active = data.filter(r => r.status === 'active');
+        setRewardsList(active);
+        setRewards(data);
+      })
+      .catch(() => {
+        setRewardsList(getRewards().filter(r => r.status === 'active'));
+      });
   }, []);
 
   const handleOpenRedeemModal = (reward) => {
@@ -55,7 +64,7 @@ export const Rewards = () => {
     setRedeemTarget(reward);
   };
 
-  const handleConfirmRedeem = () => {
+  const handleConfirmRedeem = async () => {
     if (!redeemTarget || !user) return;
 
     if ((user.skillPoints || 0) < redeemTarget.pointsRequired) {
@@ -121,6 +130,12 @@ export const Rewards = () => {
       link: '/student/redemptions'
     });
     setNotifications(allNotifs);
+
+    // Persist to backend (fire-and-forget)
+    try {
+      await apiCreateRedemption(newRedemption);
+      await apiUpdateUser(updatedUser.id, { skillPoints: updatedUser.skillPoints });
+    } catch {}
 
     setSuccessModalData(newRedemption);
     setRedeemTarget(null);

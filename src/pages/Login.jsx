@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getUsers, setCurrentUser } from '../utils/localStorage';
+import { apiLogin, saveToken } from '../utils/api';
 
 export const Login = () => {
   const navigate = useNavigate();
@@ -14,35 +15,48 @@ export const Login = () => {
   const [successNotice, setSuccessNotice] = useState(location.state?.successMessage || '');
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessNotice('');
 
-    const users = getUsers();
-    const foundUser = users.find(
-      (u) =>
-        u.email?.trim().toLowerCase() === email.trim().toLowerCase() &&
-        u.password === password &&
-        u.role === role
-    );
+    try {
+      // Try backend first
+      const data = await apiLogin({ email: email.trim(), password, role });
+      saveToken(data.token);
+      setCurrentUser(data.user);
 
-    if (!foundUser) {
-      setError('Invalid email or password.');
-      return;
+      if (data.user.role === 'student') navigate('/student/dashboard');
+      else if (data.user.role === 'faculty') navigate('/faculty/dashboard');
+      else if (data.user.role === 'vendor') navigate('/vendor/dashboard');
+      else navigate('/student/dashboard');
+    } catch (backendErr) {
+      // Fallback: try localStorage (demo accounts / offline)
+      const users = getUsers();
+      const foundUser = users.find(
+        (u) =>
+          u.email?.trim().toLowerCase() === email.trim().toLowerCase() &&
+          u.password === password &&
+          u.role === role
+      );
+
+      if (!foundUser) {
+        setError(backendErr.message || 'Invalid email or password.');
+        return;
+      }
+
+      if (foundUser.status === 'deactivated' || foundUser.status === 'inactive') {
+        setError('This account has been deactivated.');
+        return;
+      }
+
+      setCurrentUser(foundUser);
+
+      if (foundUser.role === 'student') navigate('/student/dashboard');
+      else if (foundUser.role === 'faculty') navigate('/faculty/dashboard');
+      else if (foundUser.role === 'vendor') navigate('/vendor/dashboard');
+      else navigate('/student/dashboard');
     }
-
-    if (foundUser.status === 'deactivated' || foundUser.status === 'inactive') {
-      setError('This account has been deactivated.');
-      return;
-    }
- 
-    setCurrentUser(foundUser);
-
-    if (foundUser.role === 'student') navigate('/student/dashboard');
-    else if (foundUser.role === 'faculty') navigate('/faculty/dashboard');
-    else if (foundUser.role === 'vendor') navigate('/vendor/dashboard');
-    else navigate('/student/dashboard');
   };
 
   return (

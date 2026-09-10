@@ -12,6 +12,7 @@ import {
   setNotifications
 } from '../../utils/localStorage';
 import { simulateEvaluation } from '../../utils/points';
+import { apiCreateSubmission, apiUpdateUser } from '../../utils/api';
 
 export const CodeEditor = () => {
   const { id } = useParams();
@@ -67,7 +68,7 @@ export const CodeEditor = () => {
     if (!challenge || !user) return;
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const evaluation = simulateEvaluation(challenge, code, language, false);
       const isAccepted = evaluation.status === 'Accepted';
 
@@ -139,6 +140,18 @@ export const CodeEditor = () => {
       setUsers(updatedUsersList);
       setCurrentUser(finalUser);
       setUser(finalUser);
+
+      // Also persist to backend (fire-and-forget)
+      try {
+        await apiCreateSubmission(newSubmission);
+        await apiUpdateUser(finalUser.id, {
+          skillPoints: finalUser.skillPoints,
+          streak: finalUser.streak,
+          solvedCount: finalUser.solvedCount,
+          attemptedCount: finalUser.attemptedCount,
+          accuracy: finalUser.accuracy
+        });
+      } catch {}
 
       setIsSubmitting(false);
       navigate(`/student/submission/${newSubmission.id}`);

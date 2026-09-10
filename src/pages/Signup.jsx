@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getUsers, setUsers, setCurrentUser } from '../utils/localStorage';
+import { apiSignup, saveToken } from '../utils/api';
 
 export const Signup = () => {
   const navigate = useNavigate();
@@ -68,52 +69,79 @@ export const Signup = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    const existingUsers = getUsers();
+    try {
+      // Try backend signup
+      const data = await apiSignup({
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+        role: formData.role,
+        studentId: formData.role === 'student' ? formData.studentId.trim() : undefined
+      });
 
-    const newUser = {
-      id: `usr_${formData.role}_${Date.now()}`,
-      name: formData.name.trim(),
-      ...(formData.role === 'student' && {
-        studentId: formData.studentId.trim(),
-        rollNumber: formData.studentId.trim()
-      }),
-      email: formData.email.trim().toLowerCase(),
-      password: formData.password,
-      role: formData.role,
-      status: 'active',
-      joinedDate: new Date().toISOString().split('T')[0],
-      skillPoints: formData.role === 'student' ? 100 : 0,
-      streak: 1,
-      longestStreak: 1,
-      solvedCount: 0,
-      attemptedCount: 0,
-      accuracy: 100,
-      unlockedBadges: formData.role === 'student' ? ['badge_first_blood'] : []
-    };
+      saveToken(data.token);
+      setCurrentUser(data.user);
+      setSuccessMsg('Account created successfully!');
 
-    existingUsers.push(newUser);
-    setUsers(existingUsers);
+      const targetRoute =
+        data.user.role === 'student'
+          ? '/student/dashboard'
+          : data.user.role === 'faculty'
+          ? '/faculty/dashboard'
+          : data.user.role === 'vendor'
+          ? '/vendor/dashboard'
+          : '/student/dashboard';
 
-    setCurrentUser(newUser);
+      setTimeout(() => {
+        navigate(targetRoute);
+      }, 600);
+    } catch (backendErr) {
+      // Fallback: localStorage-only signup
+      const existingUsers = getUsers();
 
-    setSuccessMsg('Account created successfully!');
+      const newUser = {
+        id: `usr_${formData.role}_${Date.now()}`,
+        name: formData.name.trim(),
+        ...(formData.role === 'student' && {
+          studentId: formData.studentId.trim(),
+          rollNumber: formData.studentId.trim()
+        }),
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+        role: formData.role,
+        status: 'active',
+        joinedDate: new Date().toISOString().split('T')[0],
+        skillPoints: formData.role === 'student' ? 100 : 0,
+        streak: 1,
+        longestStreak: 1,
+        solvedCount: 0,
+        attemptedCount: 0,
+        accuracy: 100,
+        unlockedBadges: formData.role === 'student' ? ['badge_first_blood'] : []
+      };
 
-    const targetRoute =
-      newUser.role === 'student'
-        ? '/student/dashboard'
-        : newUser.role === 'faculty'
-        ? '/faculty/dashboard'
-        : newUser.role === 'vendor'
-        ? '/vendor/dashboard'
-        : '/student/dashboard';
+      existingUsers.push(newUser);
+      setUsers(existingUsers);
+      setCurrentUser(newUser);
+      setSuccessMsg('Account created successfully!');
 
-    setTimeout(() => {
-      navigate(targetRoute);
-    }, 600);
+      const targetRoute =
+        newUser.role === 'student'
+          ? '/student/dashboard'
+          : newUser.role === 'faculty'
+          ? '/faculty/dashboard'
+          : newUser.role === 'vendor'
+          ? '/vendor/dashboard'
+          : '/student/dashboard';
+
+      setTimeout(() => {
+        navigate(targetRoute);
+      }, 600);
+    }
   };
 
   return (
