@@ -1,23 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getChallenges, getCurrentUser, getSubmissions } from '../../utils/localStorage';
+import { getCurrentUser } from '../../utils/localStorage';
+import { apiGetChallengeById, apiGetSubmissionsByUser } from '../../utils/api';
 
 export const ChallengeDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const user = getCurrentUser();
+
   const [challenge, setChallenge] = useState(null);
-  const [user, setUser] = useState(getCurrentUser());
   const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const all = getChallenges();
-    const found = all.find(c => c.id === id);
-    setChallenge(found || null);
-    setUser(getCurrentUser());
-    setSubmissions(getSubmissions());
+    const loadData = async () => {
+      try {
+        const [challengeData, submissionsData] = await Promise.all([
+          apiGetChallengeById(id),
+          user ? apiGetSubmissionsByUser(user.id) : Promise.resolve([])
+        ]);
+        setChallenge(challengeData);
+        setSubmissions(submissionsData);
+      } catch (err) {
+        setError('Challenge not found.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, [id]);
 
-  if (!challenge) {
+  if (loading) {
+    return <div className="py-12 text-center text-xs text-gray-400">Loading challenge...</div>;
+  }
+
+  if (error || !challenge) {
     return (
       <div className="p-8 bg-white border border-gray-200 rounded-lg text-center text-xs text-gray-500">
         <p className="font-bold text-sm text-gray-800">Challenge Not Found</p>
@@ -28,9 +46,7 @@ export const ChallengeDetails = () => {
     );
   }
 
-  const userSubmissions = submissions.filter(
-    s => s.userId === user?.id && s.challengeId === challenge.id
-  );
+  const userSubmissions = submissions.filter(s => s.challengeId === challenge.id);
   const isSolved = userSubmissions.some(s => s.status === 'Accepted');
 
   const difficultyBadges = {

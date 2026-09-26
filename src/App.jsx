@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { initLocalStorage, getCurrentUser } from './utils/localStorage';
+import { getCurrentUser } from './utils/localStorage';
 
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -18,7 +18,6 @@ import MyProgress from './pages/student/MyProgress';
 import Rewards from './pages/student/Rewards';
 import MyRedemptions from './pages/student/MyRedemptions';
 import StudentProfile from './pages/student/StudentProfile';
-import Notifications from './pages/student/Notifications';
 
 import FacultyDashboard from './pages/faculty/FacultyDashboard';
 import ManageChallenges from './pages/faculty/ManageChallenges';
@@ -28,7 +27,7 @@ import VendorDashboard from './pages/vendor/VendorDashboard';
 import ManageCoupons from './pages/vendor/ManageCoupons';
 
 const AppLayout = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
@@ -58,10 +57,6 @@ const RootRedirect = () => {
 };
 
 export function App() {
-  useEffect(() => {
-    initLocalStorage();
-  }, []);
-
   return (
     <Router>
       <Routes>
@@ -81,7 +76,6 @@ export function App() {
             <Route path="/student/rewards" element={<Rewards />} />
             <Route path="/student/redemptions" element={<MyRedemptions />} />
             <Route path="/student/profile" element={<StudentProfile />} />
-            <Route path="/student/notifications" element={<Notifications />} />
           </Route>
         </Route>
 

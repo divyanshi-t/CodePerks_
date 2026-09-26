@@ -1,37 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/StatCard';
-import { getCurrentUser, getChallenges, getSubmissions } from '../../utils/localStorage';
-import { calculateRank } from '../../utils/points';
+import { getCurrentUser, setCurrentUser } from '../../utils/localStorage';
+import { apiGetChallenges, apiGetSubmissionsByUser, apiGetLeaderboard, apiGetMe } from '../../utils/api';
 
 export const StudentDashboard = () => {
   const [user, setUser] = useState(getCurrentUser());
   const [challenges, setChallengesList] = useState([]);
   const [submissions, setSubmissionsList] = useState([]);
-  const [rank, setRank] = useState(1);
+  const [rank, setRank] = useState('-');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const u = getCurrentUser();
-    setUser(u);
-    const ch = getChallenges().filter(c => c.status === 'published');
-    setChallengesList(ch);
-    const sub = getSubmissions();
-    setSubmissionsList(sub);
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
 
-    if (u) {
-      setRank(calculateRank(u.id));
-    }
+    const loadData = async () => {
+      try {
+        // Fetch fresh user data from backend
+        const freshUser = await apiGetMe().catch(() => currentUser);
+        setUser(freshUser);
+        setCurrentUser(freshUser);
+
+        // Fetch challenges, submissions, leaderboard in parallel
+        const [challengesData, submissionsData, leaderboardData] = await Promise.all([
+          apiGetChallenges(),
+          apiGetSubmissionsByUser(freshUser.id),
+          apiGetLeaderboard()
+        ]);
+
+        const published = challengesData.filter(c => c.status === 'published');
+        setChallengesList(published);
+        setSubmissionsList(submissionsData);
+
+        // Calculate rank
+        const idx = leaderboardData.findIndex(s => s.id === freshUser.id);
+        setRank(idx !== -1 ? idx + 1 : '-');
+      } catch (err) {
+        console.error('Dashboard load error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
+
+  if (loading) {
+    return (
+      <div className="py-12 text-center text-xs text-gray-400">Loading dashboard...</div>
+    );
+  }
 
   if (!user) return null;
 
-  const userSubmissions = submissions.filter(s => s.userId === user.id);
   const userSolvedIds = new Set(
-    userSubmissions.filter(s => s.status === 'Accepted').map(s => s.challengeId)
+    submissions.filter(s => s.status === 'Accepted').map(s => s.challengeId)
   );
 
   const inProgressChallenges = challenges.filter(
-    c => !userSolvedIds.has(c.id) && userSubmissions.some(s => s.challengeId === c.id)
+    c => !userSolvedIds.has(c.id) && submissions.some(s => s.challengeId === c.id)
   );
 
   const completedCount = userSolvedIds.size;
@@ -39,10 +67,10 @@ export const StudentDashboard = () => {
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   const getLevelInfo = (pts = 0) => {
-    if (pts >= 1000) return { level: 'Level 4', name: 'Master Coder', nextThreshold: 1500, percent: 100 };
-    if (pts >= 600) return { level: 'Level 3', name: 'Advanced', nextThreshold: 1000, percent: Math.round(((pts - 600) / 400) * 100) };
-    if (pts >= 300) return { level: 'Level 2', name: 'Intermediate', nextThreshold: 600, percent: Math.round(((pts - 300) / 300) * 100) };
-    return { level: 'Level 1', name: 'Beginner', nextThreshold: 300, percent: Math.round((pts / 300) * 100) };
+    if (pts >= 1000) return { level: 'Level 4', name: 'Master Coder', percent: 100 };
+    if (pts >= 600) return { level: 'Level 3', name: 'Advanced', percent: Math.round(((pts - 600) / 400) * 100) };
+    if (pts >= 300) return { level: 'Level 2', name: 'Intermediate', percent: Math.round(((pts - 300) / 300) * 100) };
+    return { level: 'Level 1', name: 'Beginner', percent: Math.round((pts / 300) * 100) };
   };
 
   const levelInfo = getLevelInfo(user.skillPoints || 0);
@@ -215,7 +243,7 @@ export const StudentDashboard = () => {
               ) : (
                 challenges.slice(0, 5).map((ch) => {
                   const isSolved = userSolvedIds.has(ch.id);
-                  const isAttempted = userSubmissions.some(s => s.challengeId === ch.id);
+                  const isAttempted = submissions.some(s => s.challengeId === ch.id);
 
                   return (
                     <tr key={ch.id} className="hover:bg-gray-50">
@@ -288,14 +316,14 @@ export const StudentDashboard = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {userSubmissions.length === 0 ? (
+              {submissions.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="py-6 text-center text-gray-400">
                     No submissions yet. Start solving challenges above!
                   </td>
                 </tr>
               ) : (
-                userSubmissions.slice(0, 4).map((s) => (
+                submissions.slice(0, 4).map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50">
                     <td className="py-3 px-4 font-semibold text-gray-900">
                       {s.challengeTitle}

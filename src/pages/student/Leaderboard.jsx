@@ -1,36 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { getUsers, getCurrentUser } from '../../utils/localStorage';
+import { getCurrentUser } from '../../utils/localStorage';
+import { apiGetLeaderboard } from '../../utils/api';
 
 export const Leaderboard = () => {
+  const currentUser = getCurrentUser();
   const [students, setStudents] = useState([]);
-  const [currentUser, setCurrentUser] = useState(getCurrentUser());
-  const [timeframe, setTimeframe] = useState('overall');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const all = getUsers().filter(u => u.role === 'student');
-    setStudents(all);
-    setCurrentUser(getCurrentUser());
+    apiGetLeaderboard()
+      .then(data => setStudents(data))
+      .catch(() => setError('Failed to load leaderboard. Please check that the backend is running.'))
+      .finally(() => setLoading(false));
   }, []);
 
-  const getAdjustedPoints = (student) => {
-    const base = student.skillPoints || 0;
-    if (timeframe === 'weekly') return Math.round(base * 0.35);
-    if (timeframe === 'monthly') return Math.round(base * 0.75);
-    return base;
-  };
-
-  const sortedStudents = [...students]
-    .map(s => ({ ...s, displayPoints: getAdjustedPoints(s) }))
-    .sort((a, b) => b.displayPoints - a.displayPoints)
-    .map((s, idx) => ({ ...s, rank: idx + 1 }));
-
-  const filteredStudents = sortedStudents.filter(
-    s =>
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.rollNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredStudents = students.filter(s =>
+    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.studentId && s.studentId.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (s.rollNumber && s.rollNumber.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  if (loading) {
+    return <div className="py-12 text-center text-xs text-gray-400">Loading leaderboard...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -43,23 +37,13 @@ export const Leaderboard = () => {
             Rankings based on verified challenge skill points.
           </p>
         </div>
-
-        <div className="flex items-center space-x-1 bg-white border border-gray-200 p-1 rounded text-xs">
-          {['overall', 'weekly', 'monthly'].map(tf => (
-            <button
-              key={tf}
-              onClick={() => setTimeframe(tf)}
-              className={`px-3 py-1 rounded font-semibold capitalize transition ${
-                timeframe === tf
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              {tf}
-            </button>
-          ))}
-        </div>
       </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-xs overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex items-center justify-between gap-4">
@@ -70,7 +54,7 @@ export const Leaderboard = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search student or roll number..."
+            placeholder="Search by name or roll number..."
             className="px-3 py-1.5 border border-gray-300 rounded text-xs text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-blue-600 w-64"
           />
         </div>
@@ -81,21 +65,21 @@ export const Leaderboard = () => {
               <tr>
                 <th className="py-3 px-4">Rank</th>
                 <th className="py-3 px-4">Student Name</th>
-                <th className="py-3 px-4">Department & Roll No</th>
+                <th className="py-3 px-4">Student ID</th>
                 <th className="py-3 px-4 text-center">Problems Solved</th>
-                <th className="py-3 px-4 text-center">Streak</th>
                 <th className="py-3 px-4 text-right">Skill Points</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-gray-400">
-                    No students found.
+                  <td colSpan={5} className="py-8 text-center text-gray-400">
+                    {students.length === 0 ? 'No students registered yet.' : 'No students found.'}
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((st) => {
+                filteredStudents.map((st, idx) => {
+                  const rank = idx + 1;
                   const isMe = currentUser && currentUser.id === st.id;
                   return (
                     <tr
@@ -107,10 +91,10 @@ export const Leaderboard = () => {
                       }`}
                     >
                       <td className="py-3.5 px-4 whitespace-nowrap font-bold text-gray-800">
-                        {st.rank === 1 && '🥇 #1'}
-                        {st.rank === 2 && '🥈 #2'}
-                        {st.rank === 3 && '🥉 #3'}
-                        {st.rank > 3 && `#${st.rank}`}
+                        {rank === 1 && '🥇 #1'}
+                        {rank === 2 && '🥈 #2'}
+                        {rank === 3 && '🥉 #3'}
+                        {rank > 3 && `#${rank}`}
                       </td>
 
                       <td className="py-3.5 px-4 whitespace-nowrap">
@@ -124,22 +108,16 @@ export const Leaderboard = () => {
                         </div>
                       </td>
 
-                      <td className="py-3.5 px-4 whitespace-nowrap text-gray-600">
-                        {st.department} ({st.rollNumber || 'CS'})
+                      <td className="py-3.5 px-4 whitespace-nowrap text-gray-600 font-mono">
+                        {st.studentId || st.rollNumber || '-'}
                       </td>
 
                       <td className="py-3.5 px-4 whitespace-nowrap text-center font-semibold text-gray-800">
                         {st.solvedCount || 0}
                       </td>
 
-                      <td className="py-3.5 px-4 whitespace-nowrap text-center">
-                        <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-semibold text-[11px]">
-                          {st.streak || 0} Days
-                        </span>
-                      </td>
-
                       <td className="py-3.5 px-4 whitespace-nowrap text-right font-extrabold text-blue-600 text-sm">
-                        {st.displayPoints} XP
+                        {st.skillPoints || 0} XP
                       </td>
                     </tr>
                   );

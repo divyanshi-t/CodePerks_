@@ -1,29 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getRedemptions, getCurrentUser } from '../../utils/localStorage';
+import { getCurrentUser } from '../../utils/localStorage';
+import { apiGetRedemptionsByUser } from '../../utils/api';
 
 export const MyRedemptions = () => {
+  const user = getCurrentUser();
   const [redemptions, setRedemptionsList] = useState([]);
-  const [user, setUser] = useState(getCurrentUser());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState(null);
-  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
-    const all = getRedemptions();
-    const u = getCurrentUser();
-    setUser(u);
-    setRedemptionsList(all.filter(r => !r.userId || (u && r.userId === u.id)));
+    if (!user) return;
+    apiGetRedemptionsByUser(user.id)
+      .then(data => setRedemptionsList(data))
+      .catch(() => setError('Failed to load redemptions.'))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleCopy = (code, id) => {
     navigator.clipboard.writeText(code);
     setCopiedId(id);
-    setToastMessage('Coupon copied!');
-    setTimeout(() => {
-      setCopiedId(null);
-      setToastMessage('');
-    }, 2500);
+    setTimeout(() => setCopiedId(null), 2500);
   };
+
+  if (loading) {
+    return <div className="py-12 text-center text-xs text-gray-400">Loading redemptions...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -45,10 +48,9 @@ export const MyRedemptions = () => {
         </Link>
       </div>
 
-      {toastMessage && (
-        <div className="p-2.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold rounded shadow-xs flex items-center justify-between">
-          <span>✓ {toastMessage}</span>
-          <button onClick={() => setToastMessage('')} className="text-green-600 font-bold ml-2">✕</button>
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
+          {error}
         </div>
       )}
 

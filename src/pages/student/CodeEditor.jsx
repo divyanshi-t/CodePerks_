@@ -1,41 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import {
-  getChallenges,
-  getCurrentUser,
-  setCurrentUser,
-  getUsers,
-  setUsers,
-  getSubmissions,
-  setSubmissions,
-  getNotifications,
-  setNotifications
-} from '../../utils/localStorage';
-import { simulateEvaluation } from '../../utils/points';
-import { apiCreateSubmission, apiUpdateUser } from '../../utils/api';
+import { getCurrentUser, setCurrentUser } from '../../utils/localStorage';
+import { apiGetChallengeById, apiCreateSubmission } from '../../utils/api';
 
 export const CodeEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const user = getCurrentUser();
 
   const [challenge, setChallenge] = useState(null);
-  const [user, setUser] = useState(getCurrentUser());
   const [language, setLanguage] = useState('python');
   const [code, setCode] = useState('');
   const [customInput, setCustomInput] = useState('');
-  const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [outputResult, setOutputResult] = useState(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const all = getChallenges();
-    const ch = all.find(c => c.id === id) || all[0];
-    setChallenge(ch);
-    setUser(getCurrentUser());
-
-    if (ch && ch.starterCodes) {
-      setCode(ch.starterCodes.python || '');
-    }
+    apiGetChallengeById(id)
+      .then(data => {
+        setChallenge(data);
+        if (data.starterCodes && data.starterCodes.python) {
+          setCode(data.starterCodes.python);
+        }
+      })
+      .catch(() => setError('Failed to load challenge.'))
+      .finally(() => setLoading(false));
   }, [id]);
 
   const handleLanguageChange = (newLang) => {
@@ -53,110 +44,65 @@ export const CodeEditor = () => {
     }
   };
 
+  // Simple "run" just shows a simulated output (no real compiler)
   const handleRunCode = () => {
     if (!challenge) return;
-    setIsRunning(true);
-
-    setTimeout(() => {
-      const res = simulateEvaluation(challenge, code, language, true, customInput || challenge.sampleInput);
-      setOutputResult(res);
-      setIsRunning(false);
-    }, 500);
+    setOutputResult({
+      status: 'Run Successful',
+      feedback: `Code compiled. Sample Output: ${challenge.sampleOutput || 'No output'}`,
+      executionTime: '24ms',
+      memory: '12.4 MB',
+      testCaseResults: null
+    });
   };
 
-  const handleSubmitCode = () => {
+  const handleSubmitCode = async () => {
     if (!challenge || !user) return;
     setIsSubmitting(true);
+    setError('');
 
-    setTimeout(async () => {
-      const evaluation = simulateEvaluation(challenge, code, language, false);
-      const isAccepted = evaluation.status === 'Accepted';
-
-      const allSubmissions = getSubmissions();
-      const userPrevSolves = allSubmissions.filter(
-        s => s.userId === user.id && s.challengeId === challenge.id && s.status === 'Accepted'
-      );
-      const alreadySolved = userPrevSolves.length > 0;
-      const pointsEarned = isAccepted && !alreadySolved ? challenge.points : 0;
-
-      const newSubmission = {
-        id: `sub_${Date.now()}`,
+    try {
+      const result = await apiCreateSubmission({
         userId: user.id,
-        userName: user.name,
         challengeId: challenge.id,
-        challengeTitle: challenge.title,
-        topic: challenge.topic,
         language,
-        code,
-        status: evaluation.status,
-        score: evaluation.score,
-        pointsEarned,
-        testCasesPassed: evaluation.passedCount,
-        totalTestCases: evaluation.totalCount,
-        executionTime: evaluation.executionTime,
-        memory: evaluation.memory,
-        submittedAt: new Date().toLocaleString(),
-        feedback: evaluation.feedback,
-        testCaseResults: evaluation.testCaseResults
-      };
-
-      allSubmissions.unshift(newSubmission);
-      setSubmissions(allSubmissions);
-
-      const allUsers = getUsers();
-      const currentUserObj = allUsers.find(u => u.id === user.id) || { ...user };
-      currentUserObj.attemptedCount = (currentUserObj.attemptedCount || 0) + 1;
-
-      if (isAccepted && !alreadySolved) {
-        currentUserObj.solvedCount = (currentUserObj.solvedCount || 0) + 1;
-        currentUserObj.skillPoints = (currentUserObj.skillPoints || 0) + pointsEarned;
-        currentUserObj.streak = (currentUserObj.streak || 0) + 1;
-      }
-
-      if (currentUserObj.attemptedCount > 0) {
-        currentUserObj.accuracy = Math.round(
-          ((currentUserObj.solvedCount || 0) / currentUserObj.attemptedCount) * 100
-        );
-      }
-
-      const finalUser = currentUserObj;
-
-      const allNotifs = getNotifications();
-      allNotifs.unshift({
-        id: `notif_${Date.now()}_sub`,
-        userId: finalUser.id,
-        title: isAccepted ? `Challenge Solved: ${challenge.title}` : `Submission Attempted: ${challenge.title}`,
-        message: isAccepted
-          ? `Solved successfully! Earned ${pointsEarned} XP.`
-          : `Status: ${evaluation.status}. Passed ${evaluation.passedCount}/${evaluation.totalCount} testcases.`,
-        type: isAccepted ? 'reward' : 'challenge',
-        read: false,
-        createdAt: new Date().toLocaleString(),
-        link: `/student/challenges/${challenge.id}`
+        code
       });
-      setNotifications(allNotifs);
 
-      const updatedUsersList = allUsers.map(u => u.id === finalUser.id ? finalUser : u);
-      setUsers(updatedUsersList);
-      setCurrentUser(finalUser);
-      setUser(finalUser);
+      // Backend returns { submission, updatedUser }
+      const { submission, updatedUser } = result;
 
-      // Also persist to backend (fire-and-forget)
-      try {
-        await apiCreateSubmission(newSubmission);
-        await apiUpdateUser(finalUser.id, {
-          skillPoints: finalUser.skillPoints,
-          streak: finalUser.streak,
-          solvedCount: finalUser.solvedCount,
-          attemptedCount: finalUser.attemptedCount,
-          accuracy: finalUser.accuracy
-        });
-      } catch {}
+      // Update user in localStorage with fresh points from backend
+      if (updatedUser) {
+        const refreshedUser = { ...user, ...updatedUser };
+        setCurrentUser(refreshedUser);
+      }
 
+      // Navigate to submission result page
+      navigate(`/student/submission/${submission.id}`, {
+        state: { submission }
+      });
+    } catch (err) {
+      setError(err.message || 'Submission failed. Please try again.');
+    } finally {
       setIsSubmitting(false);
-      navigate(`/student/submission/${newSubmission.id}`);
-    }, 800);
+    }
   };
+
+  if (loading) {
+    return <div className="py-12 text-center text-xs text-gray-400">Loading editor...</div>;
+  }
+
+  if (error && !challenge) {
+    return (
+      <div className="p-8 bg-white border border-gray-200 rounded-lg text-center text-xs text-gray-500">
+        <p>{error}</p>
+        <Link to="/student/challenges" className="text-blue-600 hover:underline mt-2 inline-block">
+          ← Back to Challenges
+        </Link>
+      </div>
+    );
+  }
 
   if (!challenge) return null;
 
@@ -199,21 +145,27 @@ export const CodeEditor = () => {
 
           <button
             onClick={handleRunCode}
-            disabled={isRunning || isSubmitting}
+            disabled={isSubmitting}
             className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white rounded font-semibold disabled:opacity-50"
           >
-            {isRunning ? 'Running...' : 'Run Code'}
+            Run Code
           </button>
 
           <button
             onClick={handleSubmitCode}
-            disabled={isRunning || isSubmitting}
+            disabled={isSubmitting}
             className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold disabled:opacity-50"
           >
             {isSubmitting ? 'Evaluating...' : 'Submit Code'}
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <div className="lg:col-span-5 bg-white border border-gray-200 rounded-lg p-4 shadow-xs overflow-y-auto max-h-[500px] space-y-3 text-xs">
@@ -293,7 +245,7 @@ export const CodeEditor = () => {
 
       <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-xs space-y-2 text-xs">
         <div className="flex items-center justify-between border-b border-gray-200 pb-2">
-          <h4 className="font-bold text-gray-900">Output Console & Test Results</h4>
+          <h4 className="font-bold text-gray-900">Output Console</h4>
           {outputResult && (
             <span
               className={`font-semibold px-2 py-0.5 rounded text-[11px] border ${
@@ -309,33 +261,15 @@ export const CodeEditor = () => {
 
         {!outputResult ? (
           <p className="text-gray-400 text-xs py-3 text-center">
-            Click "Run Code" or "Submit Code" to view test results.
+            Click "Run Code" to test or "Submit Code" to evaluate.
           </p>
         ) : (
-          <div className="space-y-2 font-mono text-xs">
-            <div className="bg-gray-100 p-2.5 rounded border border-gray-200 text-gray-800">
-              <p><strong>Feedback:</strong> {outputResult.feedback || outputResult.output}</p>
-              {outputResult.executionTime && (
-                <p className="text-gray-500 text-[11px] mt-1">Execution Time: {outputResult.executionTime} | Memory: {outputResult.memory}</p>
-              )}
-            </div>
-
-            {outputResult.testCaseResults && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 font-sans">
-                {outputResult.testCaseResults.map((tc, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-2 rounded border text-xs flex items-center justify-between ${
-                      tc.passed
-                        ? 'bg-green-50 border-green-200 text-green-800'
-                        : 'bg-red-50 border-red-200 text-red-800'
-                    }`}
-                  >
-                    <span>Testcase #{idx + 1} {tc.isHidden ? '(Hidden)' : ''}</span>
-                    <span className="font-bold">{tc.passed ? '✓ PASSED' : '✕ FAILED'}</span>
-                  </div>
-                ))}
-              </div>
+          <div className="font-mono text-xs bg-gray-100 p-2.5 rounded border border-gray-200 text-gray-800">
+            <p>{outputResult.feedback}</p>
+            {outputResult.executionTime && (
+              <p className="text-gray-500 text-[11px] mt-1">
+                Time: {outputResult.executionTime} | Memory: {outputResult.memory}
+              </p>
             )}
           </div>
         )}

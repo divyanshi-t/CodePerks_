@@ -1,39 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrentUser, getChallenges, getSubmissions } from '../../utils/localStorage';
-import { calculateRank } from '../../utils/points';
+import { getCurrentUser } from '../../utils/localStorage';
+import { apiGetChallenges, apiGetSubmissionsByUser, apiGetLeaderboard } from '../../utils/api';
 
 export const MyProgress = () => {
-  const [user, setUser] = useState(getCurrentUser());
+  const user = getCurrentUser();
   const [challenges, setChallenges] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+  const [rank, setRank] = useState('-');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    setUser(getCurrentUser());
-    setChallenges(getChallenges().filter(c => c.status === 'published'));
-    setSubmissions(getSubmissions());
+    if (!user) return;
+    const loadData = async () => {
+      try {
+        const [challengesData, submissionsData, leaderboardData] = await Promise.all([
+          apiGetChallenges(),
+          apiGetSubmissionsByUser(user.id),
+          apiGetLeaderboard()
+        ]);
+        setChallenges(challengesData.filter(c => c.status === 'published'));
+        setSubmissions(submissionsData);
+        const idx = leaderboardData.findIndex(s => s.id === user.id);
+        setRank(idx !== -1 ? idx + 1 : '-');
+      } catch (err) {
+        setError('Failed to load progress data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, []);
+
+  if (loading) {
+    return <div className="py-12 text-center text-xs text-gray-400">Loading progress...</div>;
+  }
 
   if (!user) return null;
 
-  const rank = calculateRank(user.id);
-  const userSubmissions = submissions.filter(s => s.userId === user.id);
-  const solvedSubmissions = userSubmissions.filter(s => s.status === 'Accepted');
-  const solvedChallengeIds = new Set(solvedSubmissions.map(s => s.challengeId));
-
-  const totalChallenges = challenges.length;
+  const solvedChallengeIds = new Set(
+    submissions.filter(s => s.status === 'Accepted').map(s => s.challengeId)
+  );
   const completedChallenges = solvedChallengeIds.size;
+  const totalChallenges = challenges.length;
   const overallPercent = totalChallenges > 0 ? Math.round((completedChallenges / totalChallenges) * 100) : 0;
 
   const allTopics = [
-    'Arrays',
-    'Strings',
-    'Searching',
-    'Sorting',
-    'Linked List',
-    'Stack',
-    'Queue',
-    'Trees',
-    'Basic Programming'
+    'Arrays', 'Strings', 'Searching', 'Sorting',
+    'Linked List', 'Stack', 'Queue', 'Trees', 'Basic Programming'
   ];
 
   const topicProgress = allTopics.map(topic => {
@@ -54,6 +68,12 @@ export const MyProgress = () => {
           Track your problem-solving metrics and curriculum topic coverage.
         </p>
       </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-xs space-y-3">
         <h2 className="text-sm font-bold text-gray-900">
@@ -136,14 +156,14 @@ export const MyProgress = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {userSubmissions.length === 0 ? (
+              {submissions.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-gray-400">
                     No submissions yet.
                   </td>
                 </tr>
               ) : (
-                userSubmissions.map((s) => (
+                submissions.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50">
                     <td className="py-3 px-4 font-semibold text-gray-900">{s.challengeTitle}</td>
                     <td className="py-3 px-4">{s.topic}</td>
