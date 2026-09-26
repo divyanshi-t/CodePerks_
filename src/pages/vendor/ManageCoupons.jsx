@@ -1,154 +1,153 @@
 import React, { useState, useEffect } from 'react';
-import { getCoupons, setCoupons, getCurrentUser } from '../../utils/localStorage';
-import { apiGetCoupons, apiCreateCoupon, apiUpdateCoupon, apiDeleteCoupon } from '../../utils/api';
+import { getCurrentUser } from '../../utils/localStorage';
+import { apiGetRewards, apiCreateReward, apiUpdateReward, apiDeleteReward } from '../../utils/api';
 
 export const ManageCoupons = () => {
-  const [coupons, setCouponsList] = useState([]);
+  const [rewards, setRewardsList] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCoupon, setEditingCoupon] = useState(null);
-  const [user] = useState(getCurrentUser());
+  const [editingReward, setEditingReward] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [notice, setNotice] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const user = getCurrentUser();
+
+  const CATEGORIES = ['Food', 'Stationery', 'Events', 'Campus Offers', 'Discounts'];
+  const IMAGES = ['🍕', '🍔', '☕', '📚', '🎓', '🎪', '🎁', '💰', '🛒', '🏷️'];
 
   const initialForm = {
-    code: '',
-    title: '',
+    name: '',
     description: '',
-    discount: '20% OFF',
-    minPoints: 100,
-    storeName: 'Campus Bites Cafeteria',
-    expiryDate: '',
+    vendor: user?.name || '',
+    category: 'Food',
+    pointsRequired: 100,
+    availableQuantity: 10,
+    totalQuantity: 10,
+    image: '🎁',
+    tag: '',
     status: 'active'
   };
   const [formData, setFormData] = useState(initialForm);
 
+  const showToast = (msg) => {
+    setNotice(msg);
+    setTimeout(() => setNotice(''), 3000);
+  };
+
   useEffect(() => {
-    apiGetCoupons()
-      .then(data => {
-        setCouponsList(data);
-        setCoupons(data);
-      })
-      .catch(() => {
-        setCouponsList(getCoupons());
-      });
+    apiGetRewards()
+      .then(data => setRewardsList(data))
+      .catch(() => showToast('Failed to load rewards from backend.'))
+      .finally(() => setLoading(false));
   }, []);
- 
+
   const handleOpenAdd = () => {
-    setEditingCoupon(null);
-    const expiry = new Date();
-    expiry.setDate(expiry.getDate() + 30);
+    setEditingReward(null);
+    setFormData({ ...initialForm, vendor: user?.name || '' });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (reward) => {
+    setEditingReward(reward);
     setFormData({
-      ...initialForm,
-      expiryDate: expiry.toISOString().split('T')[0]
+      name: reward.name || '',
+      description: reward.description || '',
+      vendor: reward.vendor || user?.name || '',
+      category: reward.category || 'Food',
+      pointsRequired: reward.pointsRequired || 100,
+      availableQuantity: reward.availableQuantity || 0,
+      totalQuantity: reward.totalQuantity || 0,
+      image: reward.image || '🎁',
+      tag: reward.tag || '',
+      status: reward.status || 'active'
     });
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (coupon) => {
-    setEditingCoupon(coupon);
-    setFormData({
-      code: coupon.code || '',
-      title: coupon.title || '',
-      description: coupon.description || '',
-      discount: coupon.discount || '20% OFF',
-      minPoints: coupon.minPoints || 100,
-      storeName: coupon.storeName || 'Campus Bites Cafeteria',
-      expiryDate: coupon.expiryDate || '',
-      status: coupon.status || 'active'
-    });
-    setIsModalOpen(true);
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveCoupon = async (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    const payload = {
-      ...formData,
-      code: formData.code.trim().toUpperCase(),
-      minPoints: Number(formData.minPoints),
-      vendor: user?.name || '',
-      vendorId: user?.id || ''
-    };
-
-    try {
-      if (editingCoupon) {
-        const updated = await apiUpdateCoupon(editingCoupon.id, payload);
-        const all = getCoupons();
-        const newAll = all.map(c => c.id === editingCoupon.id ? updated : c);
-        setCoupons(newAll);
-        setCouponsList(newAll);
-      } else {
-        const created = await apiCreateCoupon(payload);
-        const all = getCoupons();
-        all.unshift(created);
-        setCoupons(all);
-        setCouponsList([created, ...coupons]);
-      }
-    } catch {
-      // Fallback: localStorage only
-      const all = getCoupons();
-      if (editingCoupon) {
-        const newAll = all.map(c =>
-          c.id === editingCoupon.id
-            ? { ...c, ...formData, code: formData.code.trim().toUpperCase(), minPoints: Number(formData.minPoints) }
-            : c
-        );
-        setCoupons(newAll);
-        setCouponsList(newAll);
-      } else {
-        const newCoupon = {
-          id: `coup_${Date.now()}`,
-          ...formData,
-          code: formData.code.trim().toUpperCase(),
-          minPoints: Number(formData.minPoints),
-          claimedCount: 0
-        };
-        all.unshift(newCoupon);
-        setCoupons(all);
-        setCouponsList(all);
-      }
+    if (!formData.name.trim()) {
+      showToast('Reward name is required.');
+      return;
+    }
+    if (!formData.pointsRequired || Number(formData.pointsRequired) <= 0) {
+      showToast('Please enter valid points required.');
+      return;
     }
 
-    setIsModalOpen(false);
-  };
+    const payload = {
+      ...formData,
+      pointsRequired: Number(formData.pointsRequired),
+      availableQuantity: Number(formData.availableQuantity),
+      totalQuantity: Number(formData.totalQuantity || formData.availableQuantity)
+    };
 
-  const handleToggleStatus = async (coupon) => {
-    const newStatus = coupon.status === 'active' ? 'inactive' : 'active';
+    setSubmitting(true);
     try {
-      await apiUpdateCoupon(coupon.id, { status: newStatus });
-    } catch {}
-    const all = getCoupons();
-    const updated = all.map(c => c.id === coupon.id ? { ...c, status: newStatus } : c);
-    setCoupons(updated);
-    setCouponsList(updated);
+      if (editingReward) {
+        const updated = await apiUpdateReward(editingReward.id, payload);
+        setRewardsList(prev => prev.map(r => r.id === editingReward.id ? updated : r));
+        showToast('Reward updated successfully.');
+      } else {
+        const created = await apiCreateReward(payload);
+        setRewardsList(prev => [created, ...prev]);
+        showToast('Reward added successfully!');
+      }
+      setIsModalOpen(false);
+    } catch (err) {
+      showToast(err.message || 'Failed to save reward.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Delete this promotional coupon?')) {
-      try {
-        await apiDeleteCoupon(id);
-      } catch {}
-      const all = getCoupons();
-      const filtered = all.filter(c => c.id !== id);
-      setCoupons(filtered);
-      setCouponsList(filtered);
+    try {
+      await apiDeleteReward(id);
+      setRewardsList(prev => prev.filter(r => r.id !== id));
+      setDeleteConfirmId(null);
+      showToast('Reward deleted.');
+    } catch (err) {
+      showToast(err.message || 'Failed to delete reward.');
     }
   };
 
-  const filteredCoupons = coupons.filter(
-    c =>
-      c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.storeName.toLowerCase().includes(searchTerm.toLowerCase())
+  const toggleStatus = async (reward) => {
+    const newStatus = reward.status === 'active' ? 'inactive' : 'active';
+    try {
+      await apiUpdateReward(reward.id, { status: newStatus });
+      setRewardsList(prev => prev.map(r => r.id === reward.id ? { ...r, status: newStatus } : r));
+      showToast(`Reward ${newStatus === 'active' ? 'activated' : 'deactivated'}.`);
+    } catch (err) {
+      showToast(err.message || 'Failed to update status.');
+    }
+  };
+
+  const filteredRewards = rewards.filter(r =>
+    r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (r.category && r.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (r.vendor && r.vendor.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  if (loading) {
+    return <div className="py-12 text-center text-xs text-gray-400">Loading rewards...</div>;
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
-            Manage Promotional Coupons
+            Manage Campus Rewards
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Configure merchant discount codes, expiry dates, and required skill point tiers.
+            Add, edit, and manage the rewards available for students to redeem with their skill points.
           </p>
         </div>
 
@@ -156,19 +155,25 @@ export const ManageCoupons = () => {
           onClick={handleOpenAdd}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition"
         >
-          + Add Promo Coupon
+          + Add New Reward
         </button>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-xs flex items-center justify-between text-xs">
+      {notice && (
+        <div className="p-2.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold rounded flex items-center justify-between">
+          <span>✓ {notice}</span>
+          <button onClick={() => setNotice('')} className="text-green-600 font-bold">✕</button>
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-xs">
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search by promo code or title..."
-          className="w-full sm:w-72 px-3 py-1.5 border border-gray-300 rounded text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
+          placeholder="Search rewards by name, category, or vendor..."
+          className="w-full px-3 py-1.5 border border-gray-300 rounded text-xs text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
         />
-        <span className="text-gray-500">{filteredCoupons.length} Offers</span>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-xs overflow-hidden">
@@ -176,62 +181,98 @@ export const ManageCoupons = () => {
           <table className="w-full text-left text-xs text-gray-600">
             <thead className="bg-gray-50 text-gray-700 font-bold uppercase tracking-wider text-[10px] border-b border-gray-200">
               <tr>
-                <th className="py-2.5 px-4">Coupon Code</th>
-                <th className="py-2.5 px-4">Offer Title</th>
-                <th className="py-2.5 px-4">Discount</th>
-                <th className="py-2.5 px-4">Store</th>
-                <th className="py-2.5 px-4 text-center">Expires</th>
+                <th className="py-2.5 px-4">Reward</th>
+                <th className="py-2.5 px-4">Category</th>
+                <th className="py-2.5 px-4 text-center">Points Required</th>
+                <th className="py-2.5 px-4 text-center">Stock</th>
                 <th className="py-2.5 px-4 text-center">Status</th>
                 <th className="py-2.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredCoupons.map(c => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-4 font-mono font-bold text-blue-700">{c.code}</td>
-                  <td className="py-3 px-4 font-semibold text-gray-900">{c.title}</td>
-                  <td className="py-3 px-4 font-bold text-gray-800">{c.discount}</td>
-                  <td className="py-3 px-4 text-gray-600">{c.storeName}</td>
-                  <td className="py-3 px-4 text-center text-gray-500">{c.expiryDate || 'Ongoing'}</td>
-                  <td className="py-3 px-4 text-center">
-                    <button
-                      onClick={() => handleToggleStatus(c)}
-                      className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${
-                        c.status === 'active'
-                          ? 'bg-green-50 text-green-700 border-green-200'
-                          : 'bg-gray-100 text-gray-600 border-gray-200'
-                      }`}
-                    >
-                      {c.status === 'active' ? 'Active' : 'Inactive'}
-                    </button>
-                  </td>
-                  <td className="py-3 px-4 text-right space-x-2">
-                    <button
-                      onClick={() => handleOpenEdit(c)}
-                      className="px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-semibold"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(c.id)}
-                      className="px-2 py-1 bg-white border border-gray-300 rounded text-red-600 hover:bg-red-50 font-semibold"
-                    >
-                      Delete
-                    </button>
+              {filteredRewards.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-gray-400">
+                    {rewards.length === 0 ? 'No rewards added yet. Click "+ Add New Reward" to get started.' : 'No matching rewards found.'}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredRewards.map((r) => (
+                  <tr key={r.id} className="hover:bg-gray-50">
+                    <td className="py-3 px-4">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-lg">{r.image || '🎁'}</span>
+                        <div>
+                          <p className="font-semibold text-gray-900">{r.name}</p>
+                          <p className="text-[11px] text-gray-400 max-w-xs truncate">{r.description}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">{r.category || '-'}</td>
+                    <td className="py-3 px-4 text-center font-bold text-blue-600">{r.pointsRequired} XP</td>
+                    <td className="py-3 px-4 text-center">
+                      <span className={`font-semibold ${r.availableQuantity > 0 ? 'text-green-700' : 'text-red-600'}`}>
+                        {r.availableQuantity} left
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => toggleStatus(r)}
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold border transition ${
+                          r.status === 'active'
+                            ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                            : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                        }`}
+                      >
+                        {r.status === 'active' ? 'Active' : 'Inactive'}
+                      </button>
+                    </td>
+                    <td className="py-3 px-4 text-right space-x-1">
+                      <button
+                        onClick={() => handleOpenEdit(r)}
+                        className="px-2.5 py-1 bg-white border border-gray-300 rounded text-gray-700 font-semibold hover:bg-gray-50"
+                      >
+                        Edit
+                      </button>
+                      {deleteConfirmId === r.id ? (
+                        <>
+                          <button
+                            onClick={() => handleDelete(r.id)}
+                            className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded font-semibold"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirmId(null)}
+                            className="px-2.5 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 font-semibold"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirmId(r.id)}
+                          className="px-2.5 py-1 bg-white border border-red-300 rounded text-red-600 font-semibold hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* Add/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-gray-900/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-5 shadow-lg border border-gray-200 space-y-4 text-xs">
+          <div className="bg-white rounded-lg max-w-lg w-full p-5 shadow-lg border border-gray-200 space-y-4 text-xs max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-gray-200 pb-3">
-              <h3 className="text-base font-bold text-gray-900">
-                {editingCoupon ? 'Edit Coupon' : 'Add New Promo Coupon'}
+              <h3 className="font-bold text-gray-900 text-sm">
+                {editingReward ? 'Edit Reward' : 'Add New Reward'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -241,79 +282,102 @@ export const ManageCoupons = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveCoupon} className="space-y-3">
+            <form onSubmit={handleSave} className="space-y-3">
               <div>
-                <label className="block font-semibold text-gray-700 mb-1">Coupon Code *</label>
+                <label className="block font-semibold text-gray-700 mb-1">Reward Name *</label>
                 <input
                   type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
                   required
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  placeholder="e.g. CAMPUS50"
-                  className="w-full p-2 border border-gray-300 rounded font-mono font-bold focus:outline-hidden focus:ring-1 focus:ring-blue-600"
+                  placeholder="e.g. Free Coffee Voucher"
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-gray-700 mb-1">Offer Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="e.g. 50% Off on Lunch Meal"
-                  className="w-full p-2 border border-gray-300 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-600"
+                <label className="block font-semibold text-gray-700 mb-1">Description</label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  rows={2}
+                  placeholder="Brief description..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-blue-600 resize-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Discount Tag *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.discount}
-                    onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
-                    placeholder="e.g. 30% OFF / Flat Rs.50"
-                    className="w-full p-2 border border-gray-300 rounded"
-                  />
+                  <label className="block font-semibold text-gray-700 mb-1">Category</label>
+                  <select
+                    name="category"
+                    value={formData.category}
+                    onChange={handleChange}
+                    className="w-full px-2 py-2 border border-gray-300 rounded text-gray-700 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
+                  >
+                    {CATEGORIES.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Min XP Required</label>
+                  <label className="block font-semibold text-gray-700 mb-1">Icon</label>
+                  <select
+                    name="image"
+                    value={formData.image}
+                    onChange={handleChange}
+                    className="w-full px-2 py-2 border border-gray-300 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-600"
+                  >
+                    {IMAGES.map(img => (
+                      <option key={img} value={img}>{img}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">Points Required *</label>
                   <input
                     type="number"
-                    value={formData.minPoints}
-                    onChange={(e) => setFormData({ ...formData, minPoints: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Store / Counter *</label>
-                  <input
-                    type="text"
+                    name="pointsRequired"
+                    value={formData.pointsRequired}
+                    onChange={handleChange}
+                    min={1}
                     required
-                    value={formData.storeName}
-                    onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded"
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Expiry Date</label>
+                  <label className="block font-semibold text-gray-700 mb-1">Available Quantity</label>
                   <input
-                    type="date"
-                    value={formData.expiryDate}
-                    onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded"
+                    type="number"
+                    name="availableQuantity"
+                    value={formData.availableQuantity}
+                    onChange={handleChange}
+                    min={0}
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-200">
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Tag (Optional)</label>
+                <input
+                  type="text"
+                  name="tag"
+                  value={formData.tag}
+                  onChange={handleChange}
+                  placeholder="e.g. Hot Deal, Limited"
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -323,9 +387,10 @@ export const ManageCoupons = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold"
+                  disabled={submitting}
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold disabled:opacity-50"
                 >
-                  {editingCoupon ? 'Save Changes' : 'Create Coupon'}
+                  {submitting ? 'Saving...' : editingReward ? 'Update Reward' : 'Add Reward'}
                 </button>
               </div>
             </form>
