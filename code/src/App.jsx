@@ -5,11 +5,9 @@ import { Sidebar } from './components/Sidebar';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { initLocalStorage, getCurrentUser } from './utils/localStorage';
 
-// Auth Pages
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 
-// Student Pages
 import StudentDashboard from './pages/student/StudentDashboard';
 import Challenges from './pages/student/Challenges';
 import ChallengeDetails from './pages/student/ChallengeDetails';
@@ -22,21 +20,13 @@ import MyRedemptions from './pages/student/MyRedemptions';
 import StudentProfile from './pages/student/StudentProfile';
 import Notifications from './pages/student/Notifications';
 
-// Faculty Pages
 import FacultyDashboard from './pages/faculty/FacultyDashboard';
 import ManageChallenges from './pages/faculty/ManageChallenges';
 import StudentPerformance from './pages/faculty/StudentPerformance';
 
-// Admin Pages
-import AdminDashboard from './pages/admin/AdminDashboard';
-import ManageUsers from './pages/admin/ManageUsers';
-import ManageRewards from './pages/admin/ManageRewards';
-
-// Vendor Pages
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import ManageCoupons from './pages/vendor/ManageCoupons';
 
-// Role-based Dashboard Layout Shell
 const AppLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -56,14 +46,12 @@ const AppLayout = () => {
   );
 };
 
-// Root Redirect Component
 const RootRedirect = () => {
   const user = getCurrentUser();
   if (!user) return <Navigate to="/login" replace />;
   const roleRoutes = {
     student: '/student/dashboard',
     faculty: '/faculty/dashboard',
-    admin: '/admin/dashboard',
     vendor: '/vendor/dashboard'
   };
   return <Navigate to={roleRoutes[user.role] || '/login'} replace />;
@@ -71,19 +59,16 @@ const RootRedirect = () => {
 
 export function App() {
   useEffect(() => {
-    // Initialize seed data if not present in localStorage
     initLocalStorage();
   }, []);
 
   return (
     <Router>
       <Routes>
-        {/* Public Authentication Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/" element={<RootRedirect />} />
 
-        {/* STUDENT ROUTES */}
         <Route element={<ProtectedRoute allowedRoles={['student']} />}>
           <Route element={<AppLayout />}>
             <Route path="/student/dashboard" element={<StudentDashboard />} />
@@ -100,7 +85,6 @@ export function App() {
           </Route>
         </Route>
 
-        {/* FACULTY ROUTES */}
         <Route element={<ProtectedRoute allowedRoles={['faculty']} />}>
           <Route element={<AppLayout />}>
             <Route path="/faculty/dashboard" element={<FacultyDashboard />} />
@@ -109,16 +93,6 @@ export function App() {
           </Route>
         </Route>
 
-        {/* ADMIN ROUTES */}
-        <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-          <Route element={<AppLayout />}>
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<ManageUsers />} />
-            <Route path="/admin/rewards" element={<ManageRewards />} />
-          </Route>
-        </Route>
-
-        {/* VENDOR ROUTES */}
         <Route element={<ProtectedRoute allowedRoles={['vendor']} />}>
           <Route element={<AppLayout />}>
             <Route path="/vendor/dashboard" element={<VendorDashboard />} />
@@ -126,7 +100,6 @@ export function App() {
           </Route>
         </Route>
 
-        {/* Fallback Catch-all */}
         <Route path="*" element={<RootRedirect />} />
       </Routes>
     </Router>

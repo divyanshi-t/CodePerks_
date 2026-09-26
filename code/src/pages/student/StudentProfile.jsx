@@ -34,7 +34,6 @@ export const StudentProfile = () => {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Profile Header */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-xs space-y-4 text-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
           <div>
@@ -56,7 +55,6 @@ export const StudentProfile = () => {
           </div>
         </div>
 
-        {/* Bio Section */}
         <div>
           <span className="font-bold text-gray-700 uppercase text-[11px] block mb-1">
             Student Bio & Placement Goals
@@ -99,7 +97,6 @@ export const StudentProfile = () => {
         </div>
       </div>
 
-      {/* 4 Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs text-center">
         <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-xs">
           <span className="text-gray-500 block">Campus Rank</span>

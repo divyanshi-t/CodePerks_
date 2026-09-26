@@ -1,6 +1,5 @@
 import { getUsers, setUsers, getCurrentUser, setCurrentUser, getBadges, getNotifications, setNotifications } from './localStorage';
 
-// Calculate Level and XP boundaries
 export const calculateLevel = (points = 0) => {
   const levels = [
     { level: 1, name: 'Novice Coder', min: 0, max: 200 },

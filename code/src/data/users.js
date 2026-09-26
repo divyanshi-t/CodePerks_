@@ -146,20 +146,6 @@ export const initialUsers = [
     status: 'active',
     joinedDate: '2023-01-15'
   },
-  // ADMIN
-  {
-    id: 'usr_admin_1',
-    name: 'Prof. Rajesh Verma',
-    studentId: 'ADM-01',
-    email: 'admin@codeperks.com',
-    password: 'admin123',
-    role: 'admin',
-    department: 'Campus IT Operations',
-    designation: 'Chief System Administrator',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-    status: 'active',
-    joinedDate: '2022-06-01'
-  },
   // VENDOR
   {
     id: 'usr_vendor_1',

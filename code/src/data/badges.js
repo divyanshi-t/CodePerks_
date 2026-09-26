@@ -1,4 +1,5 @@
 // Badges & Achievements Data for CodePerks
+
 export const initialBadges = [
   {
     id: 'badge_first_blood',

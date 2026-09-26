@@ -7,7 +7,6 @@ export const Challenges = () => {
   const [user, setUser] = useState(getCurrentUser());
   const [submissions, setSubmissions] = useState([]);
 
-  // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [selectedTopic, setSelectedTopic] = useState('All');
@@ -48,7 +47,6 @@ export const Challenges = () => {
       .map(s => s.challengeId)
   );
 
-  // Filter
   const filteredChallenges = challenges.filter(c => {
     const matchesSearch = 
       c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -59,15 +57,16 @@ export const Challenges = () => {
     const matchesTopic = selectedTopic === 'All' || c.topic === selectedTopic;
 
     const isSolved = userSolvedIds.has(c.id);
+    const isAttempted = userAttemptedIds.has(c.id);
     const matchesStatus = 
       selectedStatus === 'All' ||
-      (selectedStatus === 'Solved' && isSolved) ||
-      (selectedStatus === 'Unsolved' && !isSolved);
+      (selectedStatus === 'Completed' && isSolved) ||
+      (selectedStatus === 'In Progress' && !isSolved && isAttempted) ||
+      (selectedStatus === 'Not Started' && !isSolved && !isAttempted);
 
     return matchesSearch && matchesDifficulty && matchesTopic && matchesStatus;
   });
 
-  // Sort
   const diffOrder = { Easy: 1, Medium: 2, Hard: 3 };
   const sortedChallenges = [...filteredChallenges].sort((a, b) => {
     if (sortBy === 'points-desc') return (b.points || 0) - (a.points || 0);
@@ -87,7 +86,6 @@ export const Challenges = () => {
 
   return (
     <div className="space-y-6">
-      {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
@@ -103,10 +101,8 @@ export const Challenges = () => {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5 text-xs">
-          {/* Search */}
           <div className="md:col-span-2">
             <input
               type="text"
@@ -117,7 +113,6 @@ export const Challenges = () => {
             />
           </div>
 
-          {/* Topic */}
           <div>
             <select
               value={selectedTopic}
@@ -130,7 +125,6 @@ export const Challenges = () => {
             </select>
           </div>
 
-          {/* Difficulty */}
           <div>
             <select
               value={selectedDifficulty}
@@ -143,7 +137,6 @@ export const Challenges = () => {
             </select>
           </div>
 
-          {/* Sort */}
           <div>
             <select
               value={sortBy}
@@ -158,11 +151,10 @@ export const Challenges = () => {
           </div>
         </div>
 
-        {/* Status Pill Filters */}
         <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-xs">
           <div className="flex items-center space-x-2">
             <span className="text-gray-500 font-semibold">Status:</span>
-            {['All', 'Solved', 'Unsolved'].map(st => (
+            {['All', 'Completed', 'In Progress', 'Not Started'].map(st => (
               <button
                 key={st}
                 onClick={() => setSelectedStatus(st)}
@@ -186,7 +178,6 @@ export const Challenges = () => {
         </div>
       </div>
 
-      {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {sortedChallenges.length === 0 ? (
           <div className="col-span-full p-12 bg-white border border-gray-200 rounded-lg text-center text-xs text-gray-400">

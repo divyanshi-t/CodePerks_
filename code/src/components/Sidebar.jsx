@@ -29,12 +29,6 @@ export const Sidebar = ({ isOpen, closeSidebar }) => {
     { name: 'Student Performance', path: '/faculty/students' },
   ];
 
-  const adminLinks = [
-    { name: 'Dashboard', path: '/admin/dashboard' },
-    { name: 'Manage Users', path: '/admin/users' },
-    { name: 'Manage Rewards', path: '/admin/rewards' },
-  ];
-
   const vendorLinks = [
     { name: 'Dashboard', path: '/vendor/dashboard' },
     { name: 'Manage Coupons', path: '/vendor/coupons' },
@@ -46,9 +40,6 @@ export const Sidebar = ({ isOpen, closeSidebar }) => {
   if (user.role === 'faculty') {
     currentNavLinks = facultyLinks;
     roleTitle = 'Faculty Portal';
-  } else if (user.role === 'admin') {
-    currentNavLinks = adminLinks;
-    roleTitle = 'Admin Portal';
   } else if (user.role === 'vendor') {
     currentNavLinks = vendorLinks;
     roleTitle = 'Vendor Portal';
@@ -64,7 +55,6 @@ export const Sidebar = ({ isOpen, closeSidebar }) => {
         />
       )}
 
-      {/* Sidebar element */}
       <aside
         className={`fixed top-0 bottom-0 left-0 z-50 w-56 bg-white border-r border-gray-200 flex flex-col transition-transform md:translate-x-0 md:static ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
@@ -84,7 +74,6 @@ export const Sidebar = ({ isOpen, closeSidebar }) => {
           </button>
         </div>
 
-        {/* Navigation list */}
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto text-xs">
           {currentNavLinks.map((link) => (
             <NavLink
@@ -104,7 +93,6 @@ export const Sidebar = ({ isOpen, closeSidebar }) => {
           ))}
         </nav>
 
-        {/* Bottom User & Logout */}
         <div className="p-3 border-t border-gray-200 bg-gray-50">
           <div className="mb-2 text-xs">
             <span className="font-bold text-gray-800 block truncate">{user.name}</span>

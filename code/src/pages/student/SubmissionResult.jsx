@@ -18,7 +18,7 @@ export const SubmissionResult = () => {
   if (!submission) {
     return (
       <div className="p-8 bg-white border border-gray-200 rounded-lg text-center text-xs text-gray-500">
-        <p className="font-bold text-sm text-gray-800">Submission Record Not Found</p>
+        <p className="font-bold text-sm text-gray-800">No submissions yet.</p>
         <Link to="/student/challenges" className="text-blue-600 hover:underline mt-2 inline-block">
           ← Back to Challenges
         </Link>
@@ -30,12 +30,11 @@ export const SubmissionResult = () => {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Result Status Card */}
       <div
         className={`border rounded-lg p-6 shadow-xs ${
           isAccepted
-            ? 'bg-green-50/70 border-green-300 text-green-900'
-            : 'bg-red-50/70 border-red-300 text-red-900'
+            ? 'bg-green-50/80 border-green-300 text-green-900'
+            : 'bg-red-50/80 border-red-300 text-red-900'
         }`}
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -44,23 +43,25 @@ export const SubmissionResult = () => {
               Evaluation Result
             </span>
             <h1 className="text-2xl font-bold">
-              {isAccepted ? '✓ Status: Accepted' : '✕ Status: Wrong Answer'}
+              {isAccepted ? 'Accepted ✓' : 'Wrong Answer'}
             </h1>
-            <p className="text-xs mt-1">
+            <p className="text-xs mt-1 font-medium">
+              {isAccepted ? 'Challenge completed successfully.' : 'Try again.'}
+            </p>
+            <p className="text-xs text-gray-600 mt-1">
               Problem: <strong>{submission.challengeTitle}</strong> ({submission.topic})
             </p>
           </div>
 
           <div className="text-right">
-            <span className="text-xs block opacity-80">Score Earned</span>
+            <span className="text-xs block opacity-80">Points</span>
             <span className="text-2xl font-extrabold text-blue-700">
-              +{submission.pointsEarned || submission.score} XP
+              {isAccepted ? `+${submission.pointsEarned || submission.score} Points` : '0 Points'}
             </span>
           </div>
         </div>
       </div>
 
-      {/* 4 Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
         <div className="bg-white p-3.5 border border-gray-200 rounded-lg text-center shadow-xs">
           <span className="text-gray-500 block">Testcases Passed</span>
@@ -72,14 +73,14 @@ export const SubmissionResult = () => {
         <div className="bg-white p-3.5 border border-gray-200 rounded-lg text-center shadow-xs">
           <span className="text-gray-500 block">Runtime</span>
           <span className="text-base font-bold text-gray-900 mt-1 block">
-            {submission.executionTime || '14ms'}
+            {submission.executionTime || '12ms'}
           </span>
         </div>
 
         <div className="bg-white p-3.5 border border-gray-200 rounded-lg text-center shadow-xs">
           <span className="text-gray-500 block">Memory</span>
           <span className="text-base font-bold text-gray-900 mt-1 block">
-            {submission.memory || '9.2 MB'}
+            {submission.memory || '8.4 MB'}
           </span>
         </div>
 
@@ -91,7 +92,6 @@ export const SubmissionResult = () => {
         </div>
       </div>
 
-      {/* Feedback Card */}
       <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-xs space-y-3 text-xs">
         <h3 className="font-bold text-gray-900 uppercase text-[11px]">
           Evaluation Feedback
@@ -122,7 +122,6 @@ export const SubmissionResult = () => {
         )}
       </div>
 
-      {/* Buttons */}
       <div className="flex items-center justify-between pt-2">
         <button
           onClick={() => navigate(`/student/editor/${submission.challengeId}`)}

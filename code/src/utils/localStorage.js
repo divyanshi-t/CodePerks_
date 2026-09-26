@@ -18,14 +18,11 @@ const KEYS = {
   COUPONS: 'coupons',
 };
 
-// Initialize localStorage with seed data if keys don't exist
 export const initLocalStorage = () => {
-  // Check if users exist and have updated passwords
   const existingUsersStr = localStorage.getItem(KEYS.USERS);
   if (!existingUsersStr) {
     localStorage.setItem(KEYS.USERS, JSON.stringify(initialUsers));
   } else {
-    // Ensure standard demo accounts always exist with correct demo passwords
     try {
       const parsedUsers = JSON.parse(existingUsersStr);
       let updated = false;
@@ -94,7 +91,6 @@ export const setItem = (key, data) => {
   }
 };
 
-// Entity-Specific Getters and Setters
 export const getUsers = () => {
   try {
     const raw = localStorage.getItem(KEYS.USERS);
@@ -160,7 +156,6 @@ export const setRedemptions = (redemptions) => setItem(KEYS.REDEMPTIONS, redempt
 export const getCoupons = () => getItem(KEYS.COUPONS, initialVendorCoupons);
 export const setCoupons = (coupons) => setItem(KEYS.COUPONS, coupons);
 
-// Clear & Reset to demo defaults
 export const resetToDefaults = () => {
   localStorage.setItem(KEYS.USERS, JSON.stringify(initialUsers));
   localStorage.setItem(KEYS.CHALLENGES, JSON.stringify(initialChallenges));

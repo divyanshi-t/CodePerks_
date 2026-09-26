@@ -45,7 +45,6 @@ export const StudentPerformance = () => {
 
   return (
     <div className="space-y-6">
-      {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
@@ -61,7 +60,6 @@ export const StudentPerformance = () => {
         </div>
       </div>
 
-      {/* Search & Sort */}
       <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
         <input
           type="text"
@@ -86,7 +84,6 @@ export const StudentPerformance = () => {
         </div>
       </div>
 
-      {/* Students Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-gray-600">
@@ -127,7 +124,6 @@ export const StudentPerformance = () => {
         </div>
       </div>
 
-      {/* Inspect Modal */}
       {selectedStudent && (
         <div className="fixed inset-0 z-50 bg-gray-900/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-lg w-full p-5 shadow-lg border border-gray-200 space-y-4 text-xs max-h-[90vh] overflow-y-auto">
@@ -145,7 +141,6 @@ export const StudentPerformance = () => {
               </button>
             </div>
 
-            {/* Stats */}
             <div className="grid grid-cols-4 gap-2 text-center">
               <div className="bg-gray-50 p-2.5 rounded border border-gray-200">
                 <span className="text-[10px] text-gray-500 uppercase block">Points</span>
@@ -165,7 +160,6 @@ export const StudentPerformance = () => {
               </div>
             </div>
 
-            {/* Badges */}
             <div>
               <h4 className="font-bold text-gray-800 uppercase text-[11px] mb-1.5">
                 Unlocked Badges ({studentUnlockedBadges.length})
@@ -183,7 +177,6 @@ export const StudentPerformance = () => {
               </div>
             </div>
 
-            {/* Submissions */}
             <div>
               <h4 className="font-bold text-gray-800 uppercase text-[11px] mb-1.5">
                 Submission Records ({studentSubmissions.length})

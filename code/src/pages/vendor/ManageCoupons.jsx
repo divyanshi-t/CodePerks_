@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { getCoupons, setCoupons } from '../../utils/localStorage';
+import { getCoupons, setCoupons, getCurrentUser } from '../../utils/localStorage';
+import { apiGetCoupons, apiCreateCoupon, apiUpdateCoupon, apiDeleteCoupon } from '../../utils/api';
 
 export const ManageCoupons = () => {
   const [coupons, setCouponsList] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState(null);
+  const [user] = useState(getCurrentUser());
 
   const initialForm = {
     code: '',
@@ -20,9 +22,16 @@ export const ManageCoupons = () => {
   const [formData, setFormData] = useState(initialForm);
 
   useEffect(() => {
-    setCouponsList(getCoupons());
+    apiGetCoupons()
+      .then(data => {
+        setCouponsList(data);
+        setCoupons(data);
+      })
+      .catch(() => {
+        setCouponsList(getCoupons());
+      });
   }, []);
-
+ 
   const handleOpenAdd = () => {
     setEditingCoupon(null);
     const expiry = new Date();
@@ -49,49 +58,74 @@ export const ManageCoupons = () => {
     setIsModalOpen(true);
   };
 
-  const handleSaveCoupon = (e) => {
+  const handleSaveCoupon = async (e) => {
     e.preventDefault();
-    const all = getCoupons();
+    const payload = {
+      ...formData,
+      code: formData.code.trim().toUpperCase(),
+      minPoints: Number(formData.minPoints),
+      vendor: user?.name || '',
+      vendorId: user?.id || ''
+    };
 
-    if (editingCoupon) {
-      const updated = all.map(c =>
-        c.id === editingCoupon.id
-          ? {
-              ...c,
-              ...formData,
-              code: formData.code.trim().toUpperCase(),
-              minPoints: Number(formData.minPoints)
-            }
-          : c
-      );
-      setCoupons(updated);
-      setCouponsList(updated);
-    } else {
-      const newCoupon = {
-        id: `coup_${Date.now()}`,
-        ...formData,
-        code: formData.code.trim().toUpperCase(),
-        minPoints: Number(formData.minPoints),
-        claimedCount: 0
-      };
-      all.unshift(newCoupon);
-      setCoupons(all);
-      setCouponsList(all);
+    try {
+      if (editingCoupon) {
+        const updated = await apiUpdateCoupon(editingCoupon.id, payload);
+        const all = getCoupons();
+        const newAll = all.map(c => c.id === editingCoupon.id ? updated : c);
+        setCoupons(newAll);
+        setCouponsList(newAll);
+      } else {
+        const created = await apiCreateCoupon(payload);
+        const all = getCoupons();
+        all.unshift(created);
+        setCoupons(all);
+        setCouponsList([created, ...coupons]);
+      }
+    } catch {
+      // Fallback: localStorage only
+      const all = getCoupons();
+      if (editingCoupon) {
+        const newAll = all.map(c =>
+          c.id === editingCoupon.id
+            ? { ...c, ...formData, code: formData.code.trim().toUpperCase(), minPoints: Number(formData.minPoints) }
+            : c
+        );
+        setCoupons(newAll);
+        setCouponsList(newAll);
+      } else {
+        const newCoupon = {
+          id: `coup_${Date.now()}`,
+          ...formData,
+          code: formData.code.trim().toUpperCase(),
+          minPoints: Number(formData.minPoints),
+          claimedCount: 0
+        };
+        all.unshift(newCoupon);
+        setCoupons(all);
+        setCouponsList(all);
+      }
     }
 
     setIsModalOpen(false);
   };
 
-  const handleToggleStatus = (coupon) => {
-    const all = getCoupons();
+  const handleToggleStatus = async (coupon) => {
     const newStatus = coupon.status === 'active' ? 'inactive' : 'active';
+    try {
+      await apiUpdateCoupon(coupon.id, { status: newStatus });
+    } catch {}
+    const all = getCoupons();
     const updated = all.map(c => c.id === coupon.id ? { ...c, status: newStatus } : c);
     setCoupons(updated);
     setCouponsList(updated);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Delete this promotional coupon?')) {
+      try {
+        await apiDeleteCoupon(id);
+      } catch {}
       const all = getCoupons();
       const filtered = all.filter(c => c.id !== id);
       setCoupons(filtered);
@@ -108,7 +142,6 @@ export const ManageCoupons = () => {
 
   return (
     <div className="space-y-6">
-      {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
@@ -127,7 +160,6 @@ export const ManageCoupons = () => {
         </button>
       </div>
 
-      {/* Search */}
       <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-xs flex items-center justify-between text-xs">
         <input
           type="text"
@@ -139,7 +171,6 @@ export const ManageCoupons = () => {
         <span className="text-gray-500">{filteredCoupons.length} Offers</span>
       </div>
 
-      {/* Coupons Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-gray-600">
@@ -195,7 +226,6 @@ export const ManageCoupons = () => {
         </div>
       </div>
 
-      {/* Add / Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-gray-900/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-5 shadow-lg border border-gray-200 space-y-4 text-xs">

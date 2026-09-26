@@ -13,6 +13,7 @@ import {
   getNotifications,
   setNotifications
 } from '../../utils/localStorage';
+import { apiCreateRedemption, apiUpdateUser, apiGetRewards } from '../../utils/api';
 
 export const Rewards = () => {
   const navigate = useNavigate();
@@ -21,7 +22,6 @@ export const Rewards = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Modal states
   const [redeemTarget, setRedeemTarget] = useState(null);
   const [successModalData, setSuccessModalData] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -37,8 +37,16 @@ export const Rewards = () => {
   ];
 
   useEffect(() => {
-    setRewardsList(getRewards().filter(r => r.status === 'active'));
     setUser(getCurrentUser());
+    apiGetRewards()
+      .then(data => {
+        const active = data.filter(r => r.status === 'active');
+        setRewardsList(active);
+        setRewards(data);
+      })
+      .catch(() => {
+        setRewardsList(getRewards().filter(r => r.status === 'active'));
+      });
   }, []);
 
   const handleOpenRedeemModal = (reward) => {
@@ -56,7 +64,7 @@ export const Rewards = () => {
     setRedeemTarget(reward);
   };
 
-  const handleConfirmRedeem = () => {
+  const handleConfirmRedeem = async () => {
     if (!redeemTarget || !user) return;
 
     if ((user.skillPoints || 0) < redeemTarget.pointsRequired) {
@@ -69,7 +77,6 @@ export const Rewards = () => {
       return;
     }
 
-    // 1. Deduct points from user
     const allUsers = getUsers();
     const updatedUser = {
       ...user,
@@ -80,7 +87,6 @@ export const Rewards = () => {
     setCurrentUser(updatedUser);
     setUser(updatedUser);
 
-    // 2. Decrement stock
     const allRewards = getRewards();
     const updatedRewards = allRewards.map(r =>
       r.id === redeemTarget.id
@@ -90,13 +96,11 @@ export const Rewards = () => {
     setRewards(updatedRewards);
     setRewardsList(updatedRewards.filter(r => r.status === 'active'));
 
-    // 3. Generate coupon code
     const randomCode = `PERK-${redeemTarget.category.substring(0, 3).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
     const expiry = new Date();
     expiry.setDate(expiry.getDate() + 30);
     const expiryFormatted = expiry.toISOString().split('T')[0];
 
-    // 4. Save redemption record
     const allRedemptions = getRedemptions();
     const newRedemption = {
       id: `red_${Date.now()}`,
@@ -114,7 +118,6 @@ export const Rewards = () => {
     allRedemptions.unshift(newRedemption);
     setRedemptions(allRedemptions);
 
-    // 5. Notification
     const allNotifs = getNotifications();
     allNotifs.unshift({
       id: `notif_${Date.now()}_redeem`,
@@ -127,6 +130,12 @@ export const Rewards = () => {
       link: '/student/redemptions'
     });
     setNotifications(allNotifs);
+
+    // Persist to backend (fire-and-forget)
+    try {
+      await apiCreateRedemption(newRedemption);
+      await apiUpdateUser(updatedUser.id, { skillPoints: updatedUser.skillPoints });
+    } catch {}
 
     setSuccessModalData(newRedemption);
     setRedeemTarget(null);
@@ -149,7 +158,6 @@ export const Rewards = () => {
 
   return (
     <div className="space-y-6">
-      {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
@@ -173,7 +181,6 @@ export const Rewards = () => {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
       <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
         <input
           type="text"
@@ -200,7 +207,6 @@ export const Rewards = () => {
         </div>
       </div>
 
-      {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredRewards.length === 0 ? (
           <div className="col-span-full p-12 bg-white border border-gray-200 rounded-lg text-center text-xs text-gray-400">
@@ -218,7 +224,6 @@ export const Rewards = () => {
         )}
       </div>
 
-      {/* Confirmation Modal */}
       {redeemTarget && (
         <div className="fixed inset-0 z-50 bg-gray-900/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-5 shadow-lg border border-gray-200 space-y-4 text-xs">
@@ -282,12 +287,11 @@ export const Rewards = () => {
         </div>
       )}
 
-      {/* Success Modal */}
       {successModalData && (
         <div className="fixed inset-0 z-50 bg-gray-900/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-5 shadow-lg border border-gray-200 text-center space-y-4 text-xs">
             <h3 className="text-base font-bold text-green-700">
-              ✓ Perk Successfully Redeemed
+              ✓ Reward redeemed successfully!
             </h3>
 
             <p className="text-gray-600">

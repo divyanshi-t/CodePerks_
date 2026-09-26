@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getUsers, setCurrentUser } from '../utils/localStorage';
+import { apiLogin, saveToken } from '../utils/api';
 
 export const Login = () => {
   const navigate = useNavigate();
@@ -14,38 +15,48 @@ export const Login = () => {
   const [successNotice, setSuccessNotice] = useState(location.state?.successMessage || '');
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessNotice('');
 
-    const users = getUsers();
-    const foundUser = users.find(
-      (u) =>
-        u.email?.trim().toLowerCase() === email.trim().toLowerCase() &&
-        u.password === password &&
-        u.role === role
-    );
+    try {
+      // Try backend first
+      const data = await apiLogin({ email: email.trim(), password, role });
+      saveToken(data.token);
+      setCurrentUser(data.user);
 
-    if (!foundUser) {
-      setError('Invalid email or password.');
-      return;
+      if (data.user.role === 'student') navigate('/student/dashboard');
+      else if (data.user.role === 'faculty') navigate('/faculty/dashboard');
+      else if (data.user.role === 'vendor') navigate('/vendor/dashboard');
+      else navigate('/student/dashboard');
+    } catch (backendErr) {
+      // Fallback: try localStorage (demo accounts / offline)
+      const users = getUsers();
+      const foundUser = users.find(
+        (u) =>
+          u.email?.trim().toLowerCase() === email.trim().toLowerCase() &&
+          u.password === password &&
+          u.role === role
+      );
+
+      if (!foundUser) {
+        setError(backendErr.message || 'Invalid email or password.');
+        return;
+      }
+
+      if (foundUser.status === 'deactivated' || foundUser.status === 'inactive') {
+        setError('This account has been deactivated.');
+        return;
+      }
+
+      setCurrentUser(foundUser);
+
+      if (foundUser.role === 'student') navigate('/student/dashboard');
+      else if (foundUser.role === 'faculty') navigate('/faculty/dashboard');
+      else if (foundUser.role === 'vendor') navigate('/vendor/dashboard');
+      else navigate('/student/dashboard');
     }
-
-    if (foundUser.status === 'deactivated' || foundUser.status === 'inactive') {
-      setError('This account has been deactivated by the Administrator.');
-      return;
-    }
-
-    // Save logged in user in localStorage
-    setCurrentUser(foundUser);
-
-    // Redirect to respective dashboard based on role
-    if (foundUser.role === 'student') navigate('/student/dashboard');
-    else if (foundUser.role === 'faculty') navigate('/faculty/dashboard');
-    else if (foundUser.role === 'admin') navigate('/admin/dashboard');
-    else if (foundUser.role === 'vendor') navigate('/vendor/dashboard');
-    else navigate('/student/dashboard');
   };
 
   return (
@@ -62,23 +73,19 @@ export const Login = () => {
             </p>
           </div>
 
-          {/* Success Notification */}
           {successNotice && (
             <div className="mb-4 p-2.5 bg-green-50 border border-green-200 text-green-800 rounded text-xs font-semibold">
               ✓ {successNotice}
             </div>
           )}
 
-          {/* Error Notification */}
           {error && (
             <div className="mb-4 p-2.5 bg-red-50 border border-red-200 text-red-700 rounded text-xs font-semibold">
               {error}
             </div>
           )}
 
-          {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            {/* Role Dropdown */}
             <div>
               <label className="block font-semibold text-gray-700 mb-1">
                 Role
@@ -94,7 +101,6 @@ export const Login = () => {
               </select>
             </div>
 
-            {/* Email */}
             <div>
               <label className="block font-semibold text-gray-700 mb-1">
                 Email
@@ -109,7 +115,6 @@ export const Login = () => {
               />
             </div>
 
-            {/* Password (No show/hide icon) */}
             <div>
               <label className="block font-semibold text-gray-700 mb-1">
                 Password
@@ -124,7 +129,6 @@ export const Login = () => {
               />
             </div>
 
-            {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between pt-1">
               <label className="flex items-center space-x-2 text-gray-600 cursor-pointer">
                 <input
@@ -145,7 +149,6 @@ export const Login = () => {
               </button>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded text-xs transition uppercase"
@@ -154,7 +157,6 @@ export const Login = () => {
             </button>
           </form>
 
-          {/* Don't have an account link */}
           <div className="mt-6 pt-4 border-t border-gray-100 text-center text-xs text-gray-600">
             <span>Don't have an account? </span>
             <Link to="/signup" className="text-blue-600 font-semibold hover:underline">
@@ -164,7 +166,6 @@ export const Login = () => {
         </div>
       </div>
 
-      {/* Simple Forgot Password Modal */}
       {showForgotModal && (
         <div className="fixed inset-0 z-50 bg-gray-900/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-sm w-full p-5 shadow-lg border border-gray-200 text-xs space-y-3">

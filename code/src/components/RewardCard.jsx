@@ -1,9 +1,16 @@
 import React from 'react';
 
 export const RewardCard = ({ reward, userPoints = 0, onRedeem }) => {
-  const canAfford = userPoints >= reward.pointsRequired;
   const inStock = reward.availableQuantity > 0;
-  const isAvailable = canAfford && inStock;
+  const canAfford = userPoints >= reward.pointsRequired;
+  const isAvailable = inStock && canAfford;
+
+  let buttonText = 'Redeem';
+  if (!inStock) {
+    buttonText = 'Unavailable';
+  } else if (!canAfford) {
+    buttonText = 'Not Enough Points';
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-xs flex flex-col justify-between hover:border-gray-300 transition">
@@ -13,7 +20,7 @@ export const RewardCard = ({ reward, userPoints = 0, onRedeem }) => {
             {reward.category}
           </span>
           <span className={`text-[11px] font-semibold ${inStock ? 'text-gray-600' : 'text-red-600'}`}>
-            {inStock ? `${reward.availableQuantity} available` : 'Out of stock'}
+            {inStock ? `Available: ${reward.availableQuantity}` : 'Unavailable'}
           </span>
         </div>
 
@@ -29,7 +36,7 @@ export const RewardCard = ({ reward, userPoints = 0, onRedeem }) => {
 
       <div className="pt-2.5 border-t border-gray-100">
         <div className="flex items-center justify-between mb-2 text-xs">
-          <span className="text-gray-500">Cost:</span>
+          <span className="text-gray-500">Required Points:</span>
           <span className="font-bold text-blue-600 text-sm">{reward.pointsRequired} XP</span>
         </div>
 
@@ -42,11 +49,7 @@ export const RewardCard = ({ reward, userPoints = 0, onRedeem }) => {
               : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
           }`}
         >
-          {!inStock
-            ? 'Sold Out'
-            : !canAfford
-            ? `Need ${reward.pointsRequired - userPoints} More XP`
-            : 'Redeem Reward'}
+          {buttonText}
         </button>
       </div>
     </div>

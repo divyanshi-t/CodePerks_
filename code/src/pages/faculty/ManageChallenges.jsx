@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getChallenges, setChallenges, getCurrentUser } from '../../utils/localStorage';
+import { apiGetChallenges, apiCreateChallenge, apiUpdateChallenge, apiDeleteChallenge } from '../../utils/api';
 
 export const ManageChallenges = () => {
   const [challenges, setChallengesList] = useState([]);
@@ -9,6 +10,12 @@ export const ManageChallenges = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingChallenge, setEditingChallenge] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [feedbackNotice, setFeedbackNotice] = useState('');
+
+  const showToast = (msg) => {
+    setFeedbackNotice(msg);
+    setTimeout(() => setFeedbackNotice(''), 3000);
+  };
 
   const initialForm = {
     title: '',
@@ -41,8 +48,15 @@ export const ManageChallenges = () => {
   ];
 
   useEffect(() => {
-    setChallengesList(getChallenges());
     setUser(getCurrentUser());
+    apiGetChallenges()
+      .then(data => {
+        setChallengesList(data);
+        setChallenges(data);
+      })
+      .catch(() => {
+        setChallengesList(getChallenges());
+      });
   }, []);
 
   const handleOpenAddModal = () => {
@@ -71,68 +85,104 @@ export const ManageChallenges = () => {
     setIsModalOpen(true);
   };
 
-  const handleSaveChallenge = (e) => {
+  const handleSaveChallenge = async (e) => {
     e.preventDefault();
-    const all = getChallenges();
 
-    if (editingChallenge) {
-      const updated = all.map(c =>
-        c.id === editingChallenge.id
-          ? {
-              ...c,
-              ...formData,
-              points: Number(formData.points),
-              updatedAt: new Date().toISOString().split('T')[0]
-            }
-          : c
-      );
-      setChallenges(updated);
-      setChallengesList(updated);
-    } else {
-      const newChall = {
-        id: `chall_${Date.now()}`,
-        ...formData,
-        points: Number(formData.points),
-        createdBy: user?.name || 'CSE Faculty',
-        createdAt: new Date().toISOString().split('T')[0],
-        acceptanceRate: '100%',
-        starterCodes: {
-          python: `import sys\n# Write solution here\nprint("Result")`,
-          cpp: `#include <iostream>\nusing namespace std;\nint main() { return 0; }`,
-          java: `import java.util.*;\npublic class Solution {\n    public static void main(String[] args) {}\n}`,
-          c: `#include <stdio.h>\nint main() { return 0; }`
-        },
-        testCases: [
-          {
-            id: 1,
-            input: formData.sampleInput || '1',
-            expectedOutput: formData.sampleOutput || '1',
-            isHidden: false
-          }
-        ]
-      };
-      all.unshift(newChall);
-      setChallenges(all);
-      setChallengesList(all);
+    if (!formData.title.trim()) {
+      alert('Please enter a challenge title.');
+      return;
+    }
+    if (!formData.points || Number(formData.points) <= 0) {
+      alert('Please enter valid points.');
+      return;
+    }
+    if (!formData.difficulty) {
+      alert('Please select a difficulty.');
+      return;
+    }
+
+    const payload = {
+      ...formData,
+      points: Number(formData.points),
+      createdBy: user?.name || 'CSE Faculty'
+    };
+
+    try {
+      if (editingChallenge) {
+        const updated = await apiUpdateChallenge(editingChallenge.id, payload);
+        const all = getChallenges();
+        const newAll = all.map(c => c.id === editingChallenge.id ? updated : c);
+        setChallenges(newAll);
+        setChallengesList(newAll);
+        showToast('Challenge updated successfully.');
+      } else {
+        const created = await apiCreateChallenge(payload);
+        const all = getChallenges();
+        all.unshift(created);
+        setChallenges(all);
+        setChallengesList([created, ...challenges]);
+        showToast('Challenge created successfully!');
+      }
+    } catch {
+      // Fallback: localStorage only
+      const all = getChallenges();
+      if (editingChallenge) {
+        const newAll = all.map(c =>
+          c.id === editingChallenge.id
+            ? { ...c, ...formData, points: Number(formData.points), updatedAt: new Date().toISOString().split('T')[0] }
+            : c
+        );
+        setChallenges(newAll);
+        setChallengesList(newAll);
+        showToast('Challenge updated successfully.');
+      } else {
+        const newChall = {
+          id: `chall_${Date.now()}`,
+          ...formData,
+          points: Number(formData.points),
+          createdBy: user?.name || 'CSE Faculty',
+          createdAt: new Date().toISOString().split('T')[0],
+          acceptanceRate: '100%',
+          starterCodes: {
+            python: `import sys\n# Write solution here\nprint("Result")`,
+            cpp: `#include <iostream>\nusing namespace std;\nint main() { return 0; }`,
+            java: `import java.util.*;\npublic class Solution {\n    public static void main(String[] args) {}\n}`,
+            c: `#include <stdio.h>\nint main() { return 0; }`
+          },
+          testCases: [{ id: 1, input: formData.sampleInput || '1', expectedOutput: formData.sampleOutput || '1', isHidden: false }]
+        };
+        all.unshift(newChall);
+        setChallenges(all);
+        setChallengesList(all);
+        showToast('Challenge created successfully!');
+      }
     }
 
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
+    try {
+      await apiDeleteChallenge(id);
+    } catch {}
     const all = getChallenges();
     const filtered = all.filter(c => c.id !== id);
     setChallenges(filtered);
     setChallengesList(filtered);
     setDeleteConfirmId(null);
+    showToast('Challenge deleted.');
   };
 
-  const toggleStatus = (challenge) => {
-    const all = getChallenges();
+  const toggleStatus = async (challenge) => {
     const newStatus = challenge.status === 'published' ? 'draft' : 'published';
+    try {
+      await apiUpdateChallenge(challenge.id, { status: newStatus });
+    } catch {}
+    const all = getChallenges();
     const updated = all.map(c => c.id === challenge.id ? { ...c, status: newStatus } : c);
     setChallenges(updated);
     setChallengesList(updated);
+    showToast(`Challenge set to ${newStatus === 'published' ? 'Published' : 'Draft'}.`);
   };
 
   const filteredChallenges = challenges.filter(c => {
@@ -163,6 +213,14 @@ export const ManageChallenges = () => {
           + Add New Challenge
         </button>
       </div>
+
+      {/* Feedback Toast */}
+      {feedbackNotice && (
+        <div className="p-2.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold rounded shadow-xs flex items-center justify-between">
+          <span>✓ {feedbackNotice}</span>
+          <button onClick={() => setFeedbackNotice('')} className="text-green-600 font-bold ml-2">✕</button>
+        </div>
+      )}
 
       {/* Filter and Search */}
       <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
@@ -207,63 +265,72 @@ export const ManageChallenges = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredChallenges.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-4 font-semibold text-gray-900">
-                    <div>
-                      <span>{c.title}</span>
-                      <p className="text-[11px] text-gray-400 font-normal line-clamp-1">{c.description}</p>
-                    </div>
-                  </td>
-
-                  <td className="py-3 px-4 whitespace-nowrap">
-                    <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200">
-                      {c.topic}
-                    </span>
-                  </td>
-
-                  <td className="py-3 px-4 whitespace-nowrap font-medium text-gray-700">
-                    {c.difficulty}
-                  </td>
-
-                  <td className="py-3 px-4 whitespace-nowrap text-center font-bold text-blue-600">
-                    {c.points} XP
-                  </td>
-
-                  <td className="py-3 px-4 whitespace-nowrap text-center text-gray-500">
-                    {c.timeLimit || '1.0s'}
-                  </td>
-
-                  <td className="py-3 px-4 whitespace-nowrap text-center">
-                    <button
-                      onClick={() => toggleStatus(c)}
-                      className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition ${
-                        c.status === 'published'
-                          ? 'bg-green-50 text-green-800 border-green-200 hover:bg-green-100'
-                          : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
-                      }`}
-                    >
-                      {c.status === 'published' ? 'Published' : 'Draft'}
-                    </button>
-                  </td>
-
-                  <td className="py-3 px-4 whitespace-nowrap text-right space-x-2">
-                    <button
-                      onClick={() => handleOpenEditModal(c)}
-                      className="px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-semibold"
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      onClick={() => setDeleteConfirmId(c.id)}
-                      className="px-2 py-1 bg-white border border-gray-300 rounded text-red-600 hover:bg-red-50 font-semibold"
-                    >
-                      Delete
-                    </button>
+              {filteredChallenges.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-gray-400">
+                    No challenges available.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredChallenges.map((c) => (
+                  <tr key={c.id} className="hover:bg-gray-50">
+                    <td className="py-3 px-4 font-semibold text-gray-900">
+                      <div>
+                        <span>{c.title}</span>
+                        <p className="text-[11px] text-gray-400 font-normal line-clamp-1">{c.description}</p>
+                      </div>
+                    </td>
+
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200">
+                        {c.topic}
+                      </span>
+                    </td>
+
+                    <td className="py-3 px-4 whitespace-nowrap font-medium text-gray-700">
+                      {c.difficulty}
+                    </td>
+
+                    <td className="py-3 px-4 whitespace-nowrap text-center font-bold text-blue-600">
+                      {c.points} XP
+                    </td>
+
+                    <td className="py-3 px-4 whitespace-nowrap text-center text-gray-500">
+                      {c.timeLimit || '1.0s'}
+                    </td>
+
+                    <td className="py-3 px-4 whitespace-nowrap text-center">
+                      <button
+                        onClick={() => toggleStatus(c)}
+                        title="Click to toggle status"
+                        className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition ${
+                          c.status === 'published'
+                            ? 'bg-green-50 text-green-800 border-green-200 hover:bg-green-100'
+                            : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+                        }`}
+                      >
+                        {c.status === 'published' ? 'Published' : 'Draft'}
+                      </button>
+                    </td>
+
+                    <td className="py-3 px-4 whitespace-nowrap text-right space-x-2">
+                      <button
+                        onClick={() => handleOpenEditModal(c)}
+                        className="px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-semibold"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => setDeleteConfirmId(c.id)}
+                        className="px-2 py-1 bg-white border border-gray-300 rounded text-red-600 hover:bg-red-50 font-semibold"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

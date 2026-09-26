@@ -51,7 +51,7 @@ export const Badges = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
-            Badges & Achievements
+            Badges &amp; Achievements
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
             Earn milestone badges by solving challenges and maintaining your coding streak.

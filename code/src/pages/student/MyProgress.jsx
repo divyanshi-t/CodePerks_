@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { StatCard } from '../../components/StatCard';
 import { getCurrentUser, getChallenges, getSubmissions } from '../../utils/localStorage';
 import { calculateRank } from '../../utils/points';
 
@@ -21,15 +20,19 @@ export const MyProgress = () => {
   const solvedSubmissions = userSubmissions.filter(s => s.status === 'Accepted');
   const solvedChallengeIds = new Set(solvedSubmissions.map(s => s.challengeId));
 
+  const totalChallenges = challenges.length;
+  const completedChallenges = solvedChallengeIds.size;
+  const overallPercent = totalChallenges > 0 ? Math.round((completedChallenges / totalChallenges) * 100) : 0;
+
   const allTopics = [
     'Arrays',
     'Strings',
+    'Searching',
+    'Sorting',
     'Linked List',
     'Stack',
     'Queue',
     'Trees',
-    'Searching',
-    'Sorting',
     'Basic Programming'
   ];
 
@@ -43,56 +46,68 @@ export const MyProgress = () => {
 
   return (
     <div className="space-y-6">
-      {/* Title */}
       <div>
         <h1 className="text-xl font-bold text-gray-900">
-          My Progress & Performance
+          My Progress
         </h1>
         <p className="text-xs text-gray-500 mt-0.5">
-          Detailed metrics across curriculum topics, solve accuracy, and submission logs.
+          Track your problem-solving metrics and curriculum topic coverage.
         </p>
       </div>
 
-      {/* 4 Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Skill Points"
-          value={`${user.skillPoints || 0} XP`}
-          subtitle="Total points accumulated"
-        />
-        <StatCard
-          title="Campus Rank"
-          value={`#${rank}`}
-          subtitle="Department leaderboard"
-        />
-        <StatCard
-          title="Current Streak"
-          value={`${user.streak || 0} Days`}
-          subtitle={`Best: ${user.longestStreak || 12} days`}
-        />
-        <StatCard
-          title="Accuracy"
-          value={`${user.accuracy || 78}%`}
-          subtitle={`${user.solvedCount || 0}/${user.attemptedCount || 0} solved`}
-        />
-      </div>
-
-      {/* Topic Mastery Progress */}
-      <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-xs space-y-4">
+      <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-xs space-y-3">
         <h2 className="text-sm font-bold text-gray-900">
-          Topic-wise Curriculum Coverage
+          Overall Progress
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <div className="flex justify-between items-center text-xs font-semibold">
+            <span className="text-gray-700">Challenges: {completedChallenges} / {totalChallenges}</span>
+            <span className="text-blue-600 font-bold">{overallPercent}% Completed</span>
+          </div>
+
+          <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden border border-gray-200">
+            <div
+              className="bg-blue-600 h-3 rounded-full transition-all"
+              style={{ width: `${overallPercent}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-xs">
+          <div className="p-2.5 bg-gray-50 rounded border border-gray-100">
+            <span className="text-gray-500 block text-[11px]">Skill Points</span>
+            <span className="text-sm font-bold text-blue-600">{user.skillPoints || 0} XP</span>
+          </div>
+          <div className="p-2.5 bg-gray-50 rounded border border-gray-100">
+            <span className="text-gray-500 block text-[11px]">Campus Rank</span>
+            <span className="text-sm font-bold text-gray-800">#{rank}</span>
+          </div>
+          <div className="p-2.5 bg-gray-50 rounded border border-gray-100 col-span-2 sm:col-span-1">
+            <span className="text-gray-500 block text-[11px]">Accuracy</span>
+            <span className="text-sm font-bold text-green-700">{user.accuracy || 100}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-xs space-y-4">
+        <h2 className="text-sm font-bold text-gray-900">
+          Topic Progress
+        </h2>
+
+        <div className="space-y-3">
           {topicProgress.map(tp => (
             <div key={tp.topic} className="p-3 bg-gray-50 border border-gray-200 rounded text-xs space-y-1.5">
-              <div className="flex justify-between font-semibold text-gray-800">
+              <div className="flex justify-between items-center font-semibold text-gray-800">
                 <span>{tp.topic}</span>
-                <span className="text-blue-600">{tp.solved} / {tp.total} ({tp.percent}%)</span>
+                <span className="text-blue-600 font-mono">
+                  {tp.solved} / {tp.total} ({tp.percent}%)
+                </span>
               </div>
-              <div className="w-full bg-gray-200 h-2 rounded overflow-hidden">
+
+              <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
                 <div
-                  className="bg-blue-600 h-2 rounded transition-all"
+                  className="bg-blue-600 h-2.5 rounded-full transition-all"
                   style={{ width: `${tp.percent}%` }}
                 />
               </div>
@@ -101,11 +116,10 @@ export const MyProgress = () => {
         </div>
       </div>
 
-      {/* Submissions Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-xs overflow-hidden">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-sm font-bold text-gray-900">
-            Complete Submission History
+            Submission History
           </h2>
         </div>
 
@@ -122,28 +136,36 @@ export const MyProgress = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {userSubmissions.map((s) => (
-                <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-4 font-semibold text-gray-900">{s.challengeTitle}</td>
-                  <td className="py-3 px-4">{s.topic}</td>
-                  <td className="py-3 px-4 uppercase font-mono">{s.language}</td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`font-semibold px-2 py-0.5 rounded text-[11px] border ${
-                        s.status === 'Accepted'
-                          ? 'bg-green-50 text-green-700 border-green-200'
-                          : 'bg-red-50 text-red-700 border-red-200'
-                      }`}
-                    >
-                      {s.status}
-                    </span>
+              {userSubmissions.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-gray-400">
+                    No submissions yet.
                   </td>
-                  <td className="py-3 px-4 font-bold text-blue-600">
-                    {s.pointsEarned ? `+${s.pointsEarned} XP` : '0 XP'}
-                  </td>
-                  <td className="py-3 px-4 text-right text-gray-400">{s.submittedAt}</td>
                 </tr>
-              ))}
+              ) : (
+                userSubmissions.map((s) => (
+                  <tr key={s.id} className="hover:bg-gray-50">
+                    <td className="py-3 px-4 font-semibold text-gray-900">{s.challengeTitle}</td>
+                    <td className="py-3 px-4">{s.topic}</td>
+                    <td className="py-3 px-4 uppercase font-mono">{s.language}</td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`font-semibold px-2 py-0.5 rounded text-[11px] border ${
+                          s.status === 'Accepted'
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : 'bg-red-50 text-red-700 border-red-200'
+                        }`}
+                      >
+                        {s.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 font-bold text-blue-600">
+                      {s.pointsEarned ? `+${s.pointsEarned} XP` : '0 XP'}
+                    </td>
+                    <td className="py-3 px-4 text-right text-gray-400">{s.submittedAt}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

@@ -12,6 +12,7 @@ import {
   setNotifications
 } from '../../utils/localStorage';
 import { simulateEvaluation } from '../../utils/points';
+import { apiCreateSubmission, apiUpdateUser } from '../../utils/api';
 
 export const CodeEditor = () => {
   const { id } = useParams();
@@ -67,7 +68,7 @@ export const CodeEditor = () => {
     if (!challenge || !user) return;
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const evaluation = simulateEvaluation(challenge, code, language, false);
       const isAccepted = evaluation.status === 'Accepted';
 
@@ -102,7 +103,6 @@ export const CodeEditor = () => {
       allSubmissions.unshift(newSubmission);
       setSubmissions(allSubmissions);
 
-      // Update User stats
       const allUsers = getUsers();
       const currentUserObj = allUsers.find(u => u.id === user.id) || { ...user };
       currentUserObj.attemptedCount = (currentUserObj.attemptedCount || 0) + 1;
@@ -141,6 +141,18 @@ export const CodeEditor = () => {
       setCurrentUser(finalUser);
       setUser(finalUser);
 
+      // Also persist to backend (fire-and-forget)
+      try {
+        await apiCreateSubmission(newSubmission);
+        await apiUpdateUser(finalUser.id, {
+          skillPoints: finalUser.skillPoints,
+          streak: finalUser.streak,
+          solvedCount: finalUser.solvedCount,
+          attemptedCount: finalUser.attemptedCount,
+          accuracy: finalUser.accuracy
+        });
+      } catch {}
+
       setIsSubmitting(false);
       navigate(`/student/submission/${newSubmission.id}`);
     }, 800);
@@ -166,7 +178,6 @@ export const CodeEditor = () => {
           </span>
         </div>
 
-        {/* Language select & Run/Submit Buttons */}
         <div className="flex items-center space-x-2 text-xs">
           <select
             value={language}
@@ -204,9 +215,7 @@ export const CodeEditor = () => {
         </div>
       </div>
 
-      {/* Main Split: Left Problem Statement / Right Code Editor */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left: Problem Statement (5 cols) */}
         <div className="lg:col-span-5 bg-white border border-gray-200 rounded-lg p-4 shadow-xs overflow-y-auto max-h-[500px] space-y-3 text-xs">
           <div>
             <h3 className="font-bold text-gray-900 text-sm mb-1">{challenge.title}</h3>
@@ -248,7 +257,6 @@ export const CodeEditor = () => {
           </div>
         </div>
 
-        {/* Right: Code Textarea Editor (7 cols) */}
         <div className="lg:col-span-7 bg-white border border-gray-200 rounded-lg p-3 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-2 border-b border-gray-200 text-xs text-gray-500 font-semibold mb-2">
@@ -266,7 +274,6 @@ export const CodeEditor = () => {
             />
           </div>
 
-          {/* Optional Custom Input Box */}
           <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
             <details className="text-gray-600">
               <summary className="cursor-pointer font-semibold text-[11px] hover:text-gray-900">
@@ -284,7 +291,6 @@ export const CodeEditor = () => {
         </div>
       </div>
 
-      {/* Bottom: Console Output / Test Results */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-xs space-y-2 text-xs">
         <div className="flex items-center justify-between border-b border-gray-200 pb-2">
           <h4 className="font-bold text-gray-900">Output Console & Test Results</h4>

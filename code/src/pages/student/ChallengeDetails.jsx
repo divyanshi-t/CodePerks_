@@ -41,7 +41,6 @@ export const ChallengeDetails = () => {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Top Nav */}
       <div className="flex items-center justify-between">
         <Link
           to="/student/challenges"
@@ -58,9 +57,7 @@ export const ChallengeDetails = () => {
         </button>
       </div>
 
-      {/* Main Details Card */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-xs space-y-6">
-        {/* Header */}
         <div className="border-b border-gray-200 pb-4">
           <div className="flex items-center space-x-2 mb-2">
             <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${difficultyBadges[challenge.difficulty]}`}>
@@ -90,7 +87,6 @@ export const ChallengeDetails = () => {
           </div>
         </div>
 
-        {/* Problem Statement */}
         <div className="space-y-4 text-xs text-gray-800 leading-relaxed">
           <div>
             <h3 className="font-bold text-gray-900 uppercase text-[11px] mb-1">
@@ -101,7 +97,6 @@ export const ChallengeDetails = () => {
             </p>
           </div>
 
-          {/* Formats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-gray-50 p-3 rounded border border-gray-200">
               <h4 className="font-bold text-gray-800 mb-1">Input Format</h4>
@@ -113,7 +108,6 @@ export const ChallengeDetails = () => {
             </div>
           </div>
 
-          {/* Constraints */}
           {challenge.constraints && (
             <div>
               <h4 className="font-bold text-gray-800 mb-1">Constraints:</h4>
@@ -123,7 +117,6 @@ export const ChallengeDetails = () => {
             </div>
           )}
 
-          {/* Sample I/O */}
           <div>
             <h4 className="font-bold text-gray-800 mb-1">Sample 1:</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -148,7 +141,6 @@ export const ChallengeDetails = () => {
           </div>
         </div>
 
-        {/* Start Button */}
         <div className="pt-4 border-t border-gray-200 flex justify-end">
           <button
             onClick={() => navigate(`/student/editor/${challenge.id}`)}

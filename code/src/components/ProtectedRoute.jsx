@@ -10,7 +10,6 @@ export const ProtectedRoute = ({ allowedRoles = [] }) => {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    // Redirect to respective dashboard if role doesn't match
     return <Navigate to={`/${user.role}/dashboard`} replace />;
   }
 
