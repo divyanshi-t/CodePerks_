@@ -1,35 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrentUser, setCurrentUser, getUsers, setUsers } from '../../utils/localStorage';
-import { calculateRank } from '../../utils/points';
+import { getCurrentUser, setCurrentUser } from '../../utils/localStorage';
+import { apiGetLeaderboard, apiUpdateUser } from '../../utils/api';
 
 export const StudentProfile = () => {
   const [user, setUser] = useState(getCurrentUser());
+  const [rank, setRank] = useState('-');
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [bioText, setBioText] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const u = getCurrentUser();
     setUser(u);
     if (u) {
       setBioText(u.bio || '');
+      // Get rank from leaderboard
+      apiGetLeaderboard()
+        .then(students => {
+          const idx = students.findIndex(s => s.id === u.id);
+          setRank(idx !== -1 ? idx + 1 : '-');
+        })
+        .catch(() => setRank('-'));
     }
   }, []);
 
   if (!user) return null;
 
-  const rank = calculateRank(user.id);
-
-  const handleSaveBio = () => {
-    const allUsers = getUsers();
-    const updated = { ...user, bio: bioText };
-    const updatedList = allUsers.map(u => u.id === user.id ? updated : u);
-    setUsers(updatedList);
-    setCurrentUser(updated);
-    setUser(updated);
-    setIsEditingBio(false);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2000);
+  const handleSaveBio = async () => {
+    setSaving(true);
+    try {
+      await apiUpdateUser(user.id, { bio: bioText });
+      const updated = { ...user, bio: bioText };
+      setCurrentUser(updated);
+      setUser(updated);
+      setIsEditingBio(false);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2000);
+    } catch (err) {
+      // Even if backend fails, update local session
+      const updated = { ...user, bio: bioText };
+      setCurrentUser(updated);
+      setUser(updated);
+      setIsEditingBio(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -44,7 +60,9 @@ export const StudentProfile = () => {
               </span>
             </div>
             <p className="text-gray-500 mt-1">
-              {user.department} ({user.semester || '6th Semester'}) • Roll No: <strong>{user.rollNumber || 'CS21B1042'}</strong>
+              {user.department ? `${user.department} • ` : ''}
+              {user.studentId ? `Student ID: ` : ''}
+              <strong>{user.studentId || user.rollNumber || ''}</strong>
             </p>
             <p className="text-gray-500">Email: {user.email}</p>
           </div>
@@ -65,14 +83,16 @@ export const StudentProfile = () => {
                 value={bioText}
                 onChange={(e) => setBioText(e.target.value)}
                 rows={2}
+                placeholder="Write something about yourself..."
                 className="w-full p-2 border border-gray-300 rounded text-xs text-gray-800 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
               />
               <div className="flex space-x-2">
                 <button
                   onClick={handleSaveBio}
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-xs"
+                  disabled={saving}
+                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-xs disabled:opacity-50"
                 >
-                  Save Bio
+                  {saving ? 'Saving...' : 'Save Bio'}
                 </button>
                 <button
                   onClick={() => setIsEditingBio(false)}
@@ -112,10 +132,9 @@ export const StudentProfile = () => {
         </div>
         <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-xs">
           <span className="text-gray-500 block">Accuracy</span>
-          <span className="text-xl font-bold text-green-700 mt-1 block">{user.accuracy || 78}%</span>
+          <span className="text-xl font-bold text-green-700 mt-1 block">{user.accuracy || 0}%</span>
         </div>
       </div>
-
     </div>
   );
 };

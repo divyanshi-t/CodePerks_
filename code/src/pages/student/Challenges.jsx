@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { ChallengeCard } from '../../components/ChallengeCard';
-import { getChallenges, getCurrentUser, getSubmissions } from '../../utils/localStorage';
+import { getCurrentUser } from '../../utils/localStorage';
+import { apiGetChallenges, apiGetSubmissionsByUser } from '../../utils/api';
 
 export const Challenges = () => {
   const [challenges, setChallenges] = useState([]);
-  const [user, setUser] = useState(getCurrentUser());
   const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const user = getCurrentUser();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
@@ -14,41 +17,36 @@ export const Challenges = () => {
   const [sortBy, setSortBy] = useState('points-desc');
 
   const topics = [
-    'All',
-    'Arrays',
-    'Strings',
-    'Linked List',
-    'Stack',
-    'Queue',
-    'Trees',
-    'Searching',
-    'Sorting',
-    'Basic Programming'
+    'All', 'Arrays', 'Strings', 'Linked List', 'Stack',
+    'Queue', 'Trees', 'Searching', 'Sorting', 'Basic Programming'
   ];
-
   const difficulties = ['All', 'Easy', 'Medium', 'Hard'];
 
   useEffect(() => {
-    const ch = getChallenges().filter(c => c.status === 'published');
-    setChallenges(ch);
-    setUser(getCurrentUser());
-    setSubmissions(getSubmissions());
+    const loadData = async () => {
+      try {
+        const [challengesData, submissionsData] = await Promise.all([
+          apiGetChallenges(),
+          user ? apiGetSubmissionsByUser(user.id) : Promise.resolve([])
+        ]);
+        setChallenges(challengesData.filter(c => c.status === 'published'));
+        setSubmissions(submissionsData);
+      } catch (err) {
+        setError('Failed to load challenges. Please check that the backend is running.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, []);
 
   const userSolvedIds = new Set(
-    submissions
-      .filter(s => s.userId === user?.id && s.status === 'Accepted')
-      .map(s => s.challengeId)
+    submissions.filter(s => s.status === 'Accepted').map(s => s.challengeId)
   );
-
-  const userAttemptedIds = new Set(
-    submissions
-      .filter(s => s.userId === user?.id)
-      .map(s => s.challengeId)
-  );
+  const userAttemptedIds = new Set(submissions.map(s => s.challengeId));
 
   const filteredChallenges = challenges.filter(c => {
-    const matchesSearch = 
+    const matchesSearch =
       c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.topic.toLowerCase().includes(searchTerm.toLowerCase());
@@ -58,7 +56,7 @@ export const Challenges = () => {
 
     const isSolved = userSolvedIds.has(c.id);
     const isAttempted = userAttemptedIds.has(c.id);
-    const matchesStatus = 
+    const matchesStatus =
       selectedStatus === 'All' ||
       (selectedStatus === 'Completed' && isSolved) ||
       (selectedStatus === 'In Progress' && !isSolved && isAttempted) ||
@@ -84,6 +82,10 @@ export const Challenges = () => {
     setSortBy('points-desc');
   };
 
+  if (loading) {
+    return <div className="py-12 text-center text-xs text-gray-400">Loading challenges...</div>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -100,6 +102,12 @@ export const Challenges = () => {
           <span>Solved: <strong className="text-green-700">{userSolvedIds.size}</strong> / {challenges.length}</span>
         </div>
       </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5 text-xs">

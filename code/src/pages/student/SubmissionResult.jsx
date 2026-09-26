@@ -1,24 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getSubmissions, getCurrentUser } from '../../utils/localStorage';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { apiGetSubmissionById } from '../../utils/api';
 
 export const SubmissionResult = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [submission, setSubmission] = useState(null);
-  const [user, setUser] = useState(getCurrentUser());
+  const location = useLocation();
+
+  const [submission, setSubmission] = useState(location.state?.submission || null);
+  const [loading, setLoading] = useState(!location.state?.submission);
 
   useEffect(() => {
-    const all = getSubmissions();
-    const found = all.find(s => s.id === id) || all[0];
-    setSubmission(found);
-    setUser(getCurrentUser());
+    // If submission not passed via state, fetch from backend
+    if (!submission) {
+      apiGetSubmissionById(id)
+        .then(data => setSubmission(data))
+        .catch(() => setSubmission(null))
+        .finally(() => setLoading(false));
+    }
   }, [id]);
+
+  if (loading) {
+    return <div className="py-12 text-center text-xs text-gray-400">Loading result...</div>;
+  }
 
   if (!submission) {
     return (
       <div className="p-8 bg-white border border-gray-200 rounded-lg text-center text-xs text-gray-500">
-        <p className="font-bold text-sm text-gray-800">No submissions yet.</p>
+        <p className="font-bold text-sm text-gray-800">Submission not found.</p>
         <Link to="/student/challenges" className="text-blue-600 hover:underline mt-2 inline-block">
           ← Back to Challenges
         </Link>
@@ -43,7 +52,7 @@ export const SubmissionResult = () => {
               Evaluation Result
             </span>
             <h1 className="text-2xl font-bold">
-              {isAccepted ? 'Accepted ✓' : 'Wrong Answer'}
+              {isAccepted ? 'Accepted ✓' : submission.status}
             </h1>
             <p className="text-xs mt-1 font-medium">
               {isAccepted ? 'Challenge completed successfully.' : 'Try again.'}
@@ -54,9 +63,11 @@ export const SubmissionResult = () => {
           </div>
 
           <div className="text-right">
-            <span className="text-xs block opacity-80">Points</span>
+            <span className="text-xs block opacity-80">Points Earned</span>
             <span className="text-2xl font-extrabold text-blue-700">
-              {isAccepted ? `+${submission.pointsEarned || submission.score} Points` : '0 Points'}
+              {isAccepted && submission.pointsEarned > 0
+                ? `+${submission.pointsEarned} XP`
+                : '0 XP'}
             </span>
           </div>
         </div>
@@ -100,7 +111,7 @@ export const SubmissionResult = () => {
           {submission.feedback}
         </p>
 
-        {submission.testCaseResults && (
+        {submission.testCaseResults && submission.testCaseResults.length > 0 && (
           <div className="pt-2">
             <h4 className="font-bold text-gray-800 mb-2">Test Case Results:</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

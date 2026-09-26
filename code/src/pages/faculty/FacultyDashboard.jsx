@@ -1,29 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/StatCard';
-import { getUsers, getChallenges, getSubmissions, getCurrentUser } from '../../utils/localStorage';
+import { getCurrentUser } from '../../utils/localStorage';
+import { apiGetUsers, apiGetChallenges, apiGetSubmissions } from '../../utils/api';
 
 export const FacultyDashboard = () => {
-  const [user, setUser] = useState(getCurrentUser());
+  const user = getCurrentUser();
   const [students, setStudents] = useState([]);
   const [challenges, setChallengesList] = useState([]);
   const [submissions, setSubmissionsList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    setUser(getCurrentUser());
-    setStudents(getUsers().filter(u => u.role === 'student'));
-    setChallengesList(getChallenges());
-    setSubmissionsList(getSubmissions());
+    const loadData = async () => {
+      try {
+        const [usersData, challengesData, submissionsData] = await Promise.all([
+          apiGetUsers(),
+          apiGetChallenges(),
+          apiGetSubmissions()
+        ]);
+        setStudents(usersData.filter(u => u.role === 'student'));
+        setChallengesList(challengesData);
+        setSubmissionsList(submissionsData);
+      } catch (err) {
+        setError('Failed to load dashboard data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, []);
 
   const totalStudents = students.length;
   const activeChallenges = challenges.filter(c => c.status === 'published').length;
   const totalSubmissions = submissions.length;
-
   const acceptedSubmissions = submissions.filter(s => s.status === 'Accepted');
   const completionRate = totalSubmissions > 0
     ? Math.round((acceptedSubmissions.length / totalSubmissions) * 100)
     : 0;
+
+  if (loading) {
+    return <div className="py-12 text-center text-xs text-gray-400">Loading dashboard...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -44,6 +63,12 @@ export const FacultyDashboard = () => {
           + Add New Challenge
         </Link>
       </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -73,7 +98,7 @@ export const FacultyDashboard = () => {
           <h2 className="text-sm font-bold text-gray-900">
             Recent Student Activity
           </h2>
-          <p className="text-[11px] text-gray-500">Live feed of student challenge completions</p>
+          <p className="text-[11px] text-gray-500">Recent accepted submissions</p>
         </div>
 
         {acceptedSubmissions.length === 0 ? (
@@ -94,7 +119,7 @@ export const FacultyDashboard = () => {
 
                 <div className="flex items-center space-x-3">
                   <span className="font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200 text-[11px]">
-                    +{sub.pointsEarned || sub.score || 50} points
+                    +{sub.pointsEarned || sub.score || 0} points
                   </span>
                   <span className="text-gray-400 text-[11px]">{sub.submittedAt}</span>
                 </div>

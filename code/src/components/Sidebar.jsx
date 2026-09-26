@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { getCurrentUser, setCurrentUser } from '../utils/localStorage';
+import { saveToken } from '../utils/api';
 
 export const Sidebar = ({ isOpen, closeSidebar }) => {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export const Sidebar = ({ isOpen, closeSidebar }) => {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    saveToken(null);
     navigate('/login');
   };
 

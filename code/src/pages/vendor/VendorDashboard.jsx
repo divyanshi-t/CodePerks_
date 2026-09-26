@@ -1,31 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/StatCard';
-import {
-  getCurrentUser,
-  getRewards,
-  getCoupons,
-  getRedemptions,
-  getUsers,
-  setRedemptions
-} from '../../utils/localStorage';
+import { getCurrentUser } from '../../utils/localStorage';
+import { apiGetRewards, apiGetRedemptions, apiUpdateRedemption } from '../../utils/api';
 
 export const VendorDashboard = () => {
-  const [user, setUser] = useState(getCurrentUser());
+  const user = getCurrentUser();
   const [rewards, setRewardsList] = useState([]);
-  const [coupons, setCouponsList] = useState([]);
   const [redemptions, setRedemptionsList] = useState([]);
-  const [users, setUsersList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [verifyCode, setVerifyCode] = useState('');
   const [verifyResult, setVerifyResult] = useState(null);
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
-    setUser(getCurrentUser());
-    setRewardsList(getRewards());
-    setCouponsList(getCoupons());
-    setRedemptionsList(getRedemptions());
-    setUsersList(getUsers());
+    const loadData = async () => {
+      try {
+        const [rewardsData, redemptionsData] = await Promise.all([
+          apiGetRewards(),
+          apiGetRedemptions()
+        ]);
+        setRewardsList(rewardsData);
+        setRedemptionsList(redemptionsData);
+      } catch (err) {
+        setError('Failed to load dashboard data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, []);
 
   const showToast = (msg) => {
@@ -33,36 +37,18 @@ export const VendorDashboard = () => {
     setTimeout(() => setNotice(''), 3000);
   };
 
-  const getStudentName = (userId) => {
-    const found = users.find(u => u.id === userId);
-    return found ? found.name : 'Alex Rivera';
-  };
-
   const handleVerifyCoupon = (e) => {
     e.preventDefault();
     if (!verifyCode.trim()) return;
 
     const trimmed = verifyCode.trim().toUpperCase();
-    const allReds = getRedemptions();
-    const found = allReds.find(r => r.couponCode.toUpperCase() === trimmed);
+    const found = redemptions.find(r => r.couponCode.toUpperCase() === trimmed);
 
     if (!found) {
-      const promoFound = coupons.find(c => c.code.toUpperCase() === trimmed);
-      if (promoFound) {
-        setVerifyResult({
-          valid: true,
-          type: 'Promo Discount Coupon',
-          title: promoFound.title,
-          details: `${promoFound.discount} at ${promoFound.storeName}`,
-          code: promoFound.code,
-          status: 'Valid Promotional Offer'
-        });
-      } else {
-        setVerifyResult({
-          valid: false,
-          message: 'Invalid Coupon Code. No matching voucher found in platform records.'
-        });
-      }
+      setVerifyResult({
+        valid: false,
+        message: 'Invalid Coupon Code. No matching voucher found in platform records.'
+      });
       return;
     }
 
@@ -70,24 +56,33 @@ export const VendorDashboard = () => {
       valid: true,
       type: 'Student Skill Voucher',
       title: found.rewardName,
-      details: `Issued to ${getStudentName(found.userId)} (${found.pointsUsed} XP).`,
+      details: `Issued to a student (${found.pointsUsed} XP used).`,
       code: found.couponCode,
       status: found.status || 'Active',
       id: found.id
     });
   };
 
-  const handleMarkAsClaimed = () => {
+  const handleMarkAsClaimed = async () => {
     if (!verifyResult || !verifyResult.id) return;
-    const allReds = getRedemptions();
-    const updated = allReds.map(r =>
-      r.id === verifyResult.id ? { ...r, status: 'Claimed' } : r
-    );
-    setRedemptions(updated);
-    setRedemptionsList(updated);
-    setVerifyResult(prev => ({ ...prev, status: 'Claimed' }));
-    showToast('Reward claimed and handed over to student.');
+    try {
+      await apiUpdateRedemption(verifyResult.id, { status: 'Claimed' });
+      setRedemptionsList(prev =>
+        prev.map(r => r.id === verifyResult.id ? { ...r, status: 'Claimed' } : r)
+      );
+      setVerifyResult(prev => ({ ...prev, status: 'Claimed' }));
+      showToast('Reward marked as claimed and handed over to student.');
+    } catch (err) {
+      showToast('Failed to update status. Please try again.');
+    }
   };
+
+  if (loading) {
+    return <div className="py-12 text-center text-xs text-gray-400">Loading dashboard...</div>;
+  }
+
+  const activeRewards = rewards.filter(r => r.status === 'active').length;
+  const totalRedemptions = redemptions.length;
 
   return (
     <div className="space-y-6">
@@ -97,7 +92,7 @@ export const VendorDashboard = () => {
             Vendor Dashboard
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Welcome, {user?.name || 'Campus Partner'} — Verify student vouchers and manage promotional offers.
+            Welcome, {user?.name || 'Campus Partner'} — Verify student vouchers and manage rewards.
           </p>
         </div>
 
@@ -105,9 +100,15 @@ export const VendorDashboard = () => {
           to="/vendor/coupons"
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition inline-block text-center"
         >
-          + Manage Store Coupons
+          + Manage Rewards
         </Link>
       </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
+          {error}
+        </div>
+      )}
 
       {notice && (
         <div className="p-2.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold rounded shadow-xs flex items-center justify-between">
@@ -116,21 +117,16 @@ export const VendorDashboard = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatCard
           title="Active Rewards"
-          value={rewards.length}
+          value={activeRewards}
           subtitle="Listed in student marketplace"
         />
         <StatCard
           title="Total Redemptions"
-          value={redemptions.length}
+          value={totalRedemptions}
           subtitle="Total vouchers generated"
-        />
-        <StatCard
-          title="Active Coupons"
-          value={coupons.length}
-          subtitle="Partner discount codes"
         />
       </div>
 
@@ -140,7 +136,7 @@ export const VendorDashboard = () => {
             Cashier Voucher Verification Terminal
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Enter the student's coupon code (e.g. PERK-FOO-123456 or CAMPUS50) to verify validity before handing over the reward.
+            Enter the student's coupon code (e.g. PERK-FOO-123456) to verify validity before handing over the reward.
           </p>
         </div>
 
@@ -150,7 +146,7 @@ export const VendorDashboard = () => {
             required
             value={verifyCode}
             onChange={(e) => setVerifyCode(e.target.value)}
-            placeholder="Enter coupon or voucher code..."
+            placeholder="Enter voucher code..."
             className="flex-1 px-3 py-2 border border-gray-300 rounded text-xs font-mono font-bold uppercase text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
           />
           <button
@@ -182,7 +178,7 @@ export const VendorDashboard = () => {
 
             {verifyResult.valid ? (
               <div className="space-y-1">
-                <p><strong>Item / Offer:</strong> {verifyResult.title}</p>
+                <p><strong>Item:</strong> {verifyResult.title}</p>
                 <p><strong>Details:</strong> {verifyResult.details}</p>
                 <p className="font-mono text-[11px]"><strong>Code:</strong> {verifyResult.code}</p>
 
@@ -204,7 +200,6 @@ export const VendorDashboard = () => {
         )}
       </div>
 
-      {/* Recent Redemptions Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-xs overflow-hidden">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-sm font-bold text-gray-900">
@@ -217,7 +212,8 @@ export const VendorDashboard = () => {
             <thead className="bg-gray-50 text-gray-700 font-bold uppercase tracking-wider text-[10px] border-b border-gray-200">
               <tr>
                 <th className="py-2.5 px-4">Reward</th>
-                <th className="py-2.5 px-4">Student</th>
+                <th className="py-2.5 px-4">Coupon Code</th>
+                <th className="py-2.5 px-4">Points Used</th>
                 <th className="py-2.5 px-4">Date</th>
                 <th className="py-2.5 px-4 text-right">Status</th>
               </tr>
@@ -225,25 +221,17 @@ export const VendorDashboard = () => {
             <tbody className="divide-y divide-gray-100">
               {redemptions.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-gray-400">
+                  <td colSpan={5} className="py-8 text-center text-gray-400">
                     No redemptions yet.
                   </td>
                 </tr>
               ) : (
-                redemptions.slice(0, 6).map(r => (
+                redemptions.slice(0, 8).map(r => (
                   <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="py-3 px-4 font-semibold text-gray-900">
-                      <div>
-                        <span>{r.rewardName}</span>
-                        <p className="text-[11px] text-gray-400 font-mono">Code: {r.couponCode}</p>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-gray-800 font-medium">
-                      {getStudentName(r.userId)}
-                    </td>
-                    <td className="py-3 px-4 text-gray-500 whitespace-nowrap">
-                      {r.redeemedAt}
-                    </td>
+                    <td className="py-3 px-4 font-semibold text-gray-900">{r.rewardName}</td>
+                    <td className="py-3 px-4 font-mono text-gray-700">{r.couponCode}</td>
+                    <td className="py-3 px-4 font-bold text-blue-600">{r.pointsUsed} XP</td>
+                    <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{r.redeemedAt}</td>
                     <td className="py-3 px-4 text-right">
                       <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${
                         r.status === 'Active'

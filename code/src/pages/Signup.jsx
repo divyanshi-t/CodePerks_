@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getUsers, setUsers, setCurrentUser } from '../utils/localStorage';
+import { setCurrentUser } from '../utils/localStorage';
 import { apiSignup, saveToken } from '../utils/api';
 
 export const Signup = () => {
@@ -16,6 +16,8 @@ export const Signup = () => {
 
   const [errors, setErrors] = useState({});
   const [successMsg, setSuccessMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -23,6 +25,7 @@ export const Signup = () => {
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+    setServerError('');
   };
 
   const validateForm = () => {
@@ -55,26 +58,17 @@ export const Signup = () => {
       newErrors.studentId = 'Student ID is required.';
     }
 
-    if (!newErrors.email) {
-      const existingUsers = getUsers();
-      const emailExists = existingUsers.some(
-        u => u.email.toLowerCase() === formData.email.trim().toLowerCase()
-      );
-      if (emailExists) {
-        newErrors.email = 'An account with this email address already exists.';
-      }
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setServerError('');
     if (!validateForm()) return;
 
+    setLoading(true);
     try {
-      // Try backend signup
       const data = await apiSignup({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
@@ -99,48 +93,10 @@ export const Signup = () => {
       setTimeout(() => {
         navigate(targetRoute);
       }, 600);
-    } catch (backendErr) {
-      // Fallback: localStorage-only signup
-      const existingUsers = getUsers();
-
-      const newUser = {
-        id: `usr_${formData.role}_${Date.now()}`,
-        name: formData.name.trim(),
-        ...(formData.role === 'student' && {
-          studentId: formData.studentId.trim(),
-          rollNumber: formData.studentId.trim()
-        }),
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-        role: formData.role,
-        status: 'active',
-        joinedDate: new Date().toISOString().split('T')[0],
-        skillPoints: formData.role === 'student' ? 100 : 0,
-        streak: 1,
-        longestStreak: 1,
-        solvedCount: 0,
-        attemptedCount: 0,
-        accuracy: 100,
-        unlockedBadges: formData.role === 'student' ? ['badge_first_blood'] : []
-      };
-
-      existingUsers.push(newUser);
-      setUsers(existingUsers);
-      setCurrentUser(newUser);
-      setSuccessMsg('Account created successfully!');
-
-      const targetRoute =
-        newUser.role === 'student'
-          ? '/student/dashboard'
-          : newUser.role === 'faculty'
-          ? '/faculty/dashboard'
-          : newUser.role === 'vendor'
-          ? '/vendor/dashboard'
-          : '/student/dashboard';
-
-      setTimeout(() => {
-        navigate(targetRoute);
-      }, 600);
+    } catch (err) {
+      setServerError(err.message || 'Signup failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -161,6 +117,12 @@ export const Signup = () => {
           {successMsg && (
             <div className="mb-4 p-2.5 bg-green-50 border border-green-200 text-green-800 rounded text-xs text-center font-semibold">
               ✓ {successMsg}
+            </div>
+          )}
+
+          {serverError && (
+            <div className="mb-4 p-2.5 bg-red-50 border border-red-200 text-red-700 rounded text-xs font-semibold">
+              {serverError}
             </div>
           )}
 
@@ -267,9 +229,10 @@ export const Signup = () => {
 
             <button
               type="submit"
-              className="w-full mt-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded text-xs transition"
+              disabled={loading}
+              className="w-full mt-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded text-xs transition disabled:opacity-60"
             >
-              CREATE ACCOUNT
+              {loading ? 'Creating Account...' : 'CREATE ACCOUNT'}
             </button>
           </form>
 

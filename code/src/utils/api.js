@@ -1,12 +1,11 @@
-// api.js - Thin API wrapper for CodePerks backend
-// All fetch calls go through here. Token is read from localStorage automatically.
+// api.js - Frontend API helper for CodePerks
+// All API calls go through here. Token is read from localStorage automatically.
 
 const BASE_URL = '/api';
 
 const getToken = () => {
   try {
-    const raw = localStorage.getItem('cpToken');
-    return raw ? raw : null;
+    return localStorage.getItem('cpToken') || null;
   } catch {
     return null;
   }
@@ -42,6 +41,7 @@ export const apiGetMe = () => request('GET', '/auth/me');
 
 // --- Users ---
 export const apiGetUsers = () => request('GET', '/users');
+export const apiGetLeaderboard = () => request('GET', '/users/leaderboard');
 export const apiGetUserById = (id) => request('GET', `/users/${id}`);
 export const apiUpdateUser = (id, payload) => request('PUT', `/users/${id}`, payload);
 
@@ -71,13 +71,7 @@ export const apiGetRedemptionsByUser = (userId) => request('GET', `/redemptions/
 export const apiCreateRedemption = (payload) => request('POST', '/redemptions', payload);
 export const apiUpdateRedemption = (id, payload) => request('PUT', `/redemptions/${id}`, payload);
 
-// --- Coupons ---
-export const apiGetCoupons = () => request('GET', '/coupons');
-export const apiCreateCoupon = (payload) => request('POST', '/coupons', payload);
-export const apiUpdateCoupon = (id, payload) => request('PUT', `/coupons/${id}`, payload);
-export const apiDeleteCoupon = (id) => request('DELETE', `/coupons/${id}`);
-
-// Save token to localStorage
+// Save / remove JWT token
 export const saveToken = (token) => {
   try {
     if (token) localStorage.setItem('cpToken', token);

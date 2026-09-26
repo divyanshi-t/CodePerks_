@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getCurrentUser, setCurrentUser } from '../utils/localStorage';
+import { saveToken } from '../utils/api';
 
 export const Navbar = ({ toggleSidebar, isSidebarOpen }) => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export const Navbar = ({ toggleSidebar, isSidebarOpen }) => {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    saveToken(null);
     navigate('/login');
   };
 
@@ -27,7 +29,7 @@ export const Navbar = ({ toggleSidebar, isSidebarOpen }) => {
       <div className="flex items-center justify-between px-4 py-2.5 max-w-7xl mx-auto">
         {/* Left: Mobile Toggle & Brand */}
         <div className="flex items-center space-x-3">
-          <button 
+          <button
             onClick={toggleSidebar}
             className="p-1.5 text-gray-600 rounded border border-gray-300 md:hidden hover:bg-gray-100"
             aria-label="Toggle Menu"
