@@ -9,7 +9,6 @@ connectDB();
 
 const app = express();
 
-// CORS - allow the Vite dev server
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5174'],
   credentials: true

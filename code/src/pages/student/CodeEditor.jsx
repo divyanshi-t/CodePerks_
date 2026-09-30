@@ -248,11 +248,10 @@ export const CodeEditor = () => {
           <h4 className="font-bold text-gray-900">Output Console</h4>
           {outputResult && (
             <span
-              className={`font-semibold px-2 py-0.5 rounded text-[11px] border ${
-                outputResult.status === 'Accepted' || outputResult.status === 'Run Successful'
-                  ? 'bg-green-50 text-green-700 border-green-200'
-                  : 'bg-red-50 text-red-700 border-red-200'
-              }`}
+              className={`font-semibold px-2 py-0.5 rounded text-[11px] border ${outputResult.status === 'Accepted' || outputResult.status === 'Run Successful'
+                ? 'bg-green-50 text-green-700 border-green-200'
+                : 'bg-red-50 text-red-700 border-red-200'
+                }`}
             >
               {outputResult.status}
             </span>
